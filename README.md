@@ -19,6 +19,21 @@ app/                    the Spring Boot demo service
 The demo runs in the `knative-demo` namespace (`kubectl create namespace
 knative-demo`).
 
+## Demo
+
+![canary and blue-green demo](demo/demo.gif)
+
+Two-pane recording: `k9s` watching `knative-demo` (top) alongside a
+scripted run of `knative-ctl canary` then `knative-ctl bluegreen` against
+the demo service (bottom). Recorded with `asciinema` + `agg` inside a
+`screen` split (`demo/screenrc`, `demo/run-demo.sh`) — re-run it yourself
+with:
+
+```
+asciinema rec demo/demo.cast -c "screen -c demo/screenrc"
+agg demo/demo.cast demo/demo.gif
+```
+
 ## Build
 
 ```

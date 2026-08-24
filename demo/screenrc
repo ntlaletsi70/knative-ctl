@@ -1,0 +1,11 @@
+chdir /home/blanketops/knative-ctl
+defscrollback 5000
+screen -t k9s 0 k9s -n knative-demo
+screen -t demo 1 bash demo/run-demo.sh
+
+split
+focus top
+select 0
+focus bottom
+select 1
+focus top

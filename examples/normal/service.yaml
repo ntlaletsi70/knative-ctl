@@ -1,0 +1,44 @@
+# Plain Knative Service: one revision, 100% traffic (the default when
+# spec.traffic is omitted -- Knative tracks status.latestReadyRevisionName
+# automatically). Apply with: kubectl apply -f examples/normal/service.yaml
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: helloworld-go
+  namespace: default
+spec:
+  template:
+    metadata:
+      name: helloworld-go-v1
+      annotations:
+        # kpa (Knative Pod Autoscaler, the default) is what enables true
+        # scale-to-zero: at 0 replicas the activator sits in the request
+        # path, buffers the incoming request, and triggers a cold-start
+        # scale-up on demand. The hpa class cannot scale below 1.
+        autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev"
+        # 0 allows the revision to scale all the way down when idle.
+        autoscaling.knative.dev/min-scale: "0"
+        # Cap replicas -- keep this low on a resource-constrained node.
+        autoscaling.knative.dev/max-scale: "3"
+        # Target concurrent in-flight requests per pod before scaling out.
+        autoscaling.knative.dev/target: "10"
+        # Scale out before hitting 100% of target, for response headroom.
+        autoscaling.knative.dev/target-utilization-percentage: "70"
+        # Hold at a higher replica count briefly after load drops, to
+        # avoid scaling down and immediately back up (flapping).
+        autoscaling.knative.dev/scale-down-delay: "30s"
+    spec:
+      containers:
+        - image: gcr.io/knative-samples/helloworld-go
+          ports:
+            - containerPort: 8080
+          env:
+            - name: TARGET
+              value: "Knative PoC on blanketops"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

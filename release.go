@@ -45,6 +45,14 @@ func runCanary(args []string) error {
 	}
 	fmt.Printf("current revision (100%% traffic): %s\n", oldRev)
 
+	// Pin traffic explicitly to the current revision before touching the
+	// template. If the service was still tracking latestRevision:true (its
+	// default, untouched state), patching the image would otherwise
+	// auto-promote the brand new, unvalidated revision to 100% immediately.
+	if err := setTraffic(*namespace, service, []trafficTarget{{RevisionName: oldRev, Percent: 100}}); err != nil {
+		return fmt.Errorf("pinning current revision before rollout: %w", err)
+	}
+
 	newRev, err := deployNewRevision(*namespace, service, image, oldRev)
 	if err != nil {
 		return err
@@ -55,9 +63,7 @@ func runCanary(args []string) error {
 		fmt.Printf("step %d/%d: shifting %d%% traffic to %s (%d%% stays on %s)\n", i+1, len(percents), p, newRev, 100-p, oldRev)
 		targets := []trafficTarget{
 			{RevisionName: newRev, Percent: p, Tag: "canary"},
-		}
-		if p < 100 {
-			targets = append(targets, trafficTarget{RevisionName: oldRev, Percent: 100 - p, Tag: "stable"})
+			{RevisionName: oldRev, Percent: 100 - p, Tag: "stable"},
 		}
 		if err := setTraffic(*namespace, service, targets); err != nil {
 			return err
@@ -67,7 +73,7 @@ func runCanary(args []string) error {
 		}
 	}
 
-	fmt.Printf("canary complete: %s now serving 100%% traffic, %s retained at 0%% for rollback\n", newRev, oldRev)
+	fmt.Printf("canary complete: %s now serving 100%% traffic, roll back any time with:\n  knative-ctl rollback %s %s --namespace %s\n", newRev, service, oldRev, *namespace)
 	return nil
 }
 
@@ -88,6 +94,14 @@ func runBlueGreen(args []string) error {
 		return fmt.Errorf("looking up current revision: %w", err)
 	}
 	fmt.Printf("current (blue) revision: %s\n", oldRev)
+
+	// Pin traffic explicitly to blue before touching the template, for the
+	// same reason as canary: otherwise a service still on latestRevision:true
+	// would flip 100% to the untested green revision the instant its image
+	// is patched, defeating the "dark deploy" guarantee.
+	if err := setTraffic(*namespace, service, []trafficTarget{{RevisionName: oldRev, Percent: 100}}); err != nil {
+		return fmt.Errorf("pinning current revision before rollout: %w", err)
+	}
 
 	newRev, err := deployNewRevision(*namespace, service, image, oldRev)
 	if err != nil {

@@ -20,12 +20,37 @@ type trafficTarget struct {
 	Tag          string `json:"tag,omitempty"`
 }
 
+// reorderArgs moves every --flag [value] pair to the front, leaving
+// non-flag tokens as trailing positional args. The stdlib flag package
+// stops parsing at the first non-flag token, which silently dropped every
+// flag placed after "<service> <image>" -- exactly the order documented
+// for canary/bluegreen/rollback (and the order deploy.yml invokes them
+// in), so e.g. --namespace was always ignored in favor of its "default"
+// zero value. None of this CLI's flags are booleans, so treating the
+// token right after every "-"-prefixed arg as its value is safe.
+func reorderArgs(args []string) []string {
+	var flags, positional []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if strings.HasPrefix(a, "-") {
+			flags = append(flags, a)
+			if !strings.Contains(a, "=") && i+1 < len(args) {
+				i++
+				flags = append(flags, args[i])
+			}
+			continue
+		}
+		positional = append(positional, a)
+	}
+	return append(flags, positional...)
+}
+
 func runCanary(args []string) error {
 	fs := flag.NewFlagSet("canary", flag.ExitOnError)
 	steps := fs.String("steps", "10,50,100", "comma-separated traffic percentages to shift to the new revision")
 	interval := fs.Duration("interval", 20*time.Second, "how long to hold each step before advancing")
 	namespace := fs.String("namespace", "default", "namespace of the service")
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 	positional := fs.Args()
@@ -80,7 +105,7 @@ func runCanary(args []string) error {
 func runBlueGreen(args []string) error {
 	fs := flag.NewFlagSet("bluegreen", flag.ExitOnError)
 	namespace := fs.String("namespace", "default", "namespace of the service")
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 	positional := fs.Args()
@@ -125,7 +150,7 @@ func runBlueGreen(args []string) error {
 func runRollback(args []string) error {
 	fs := flag.NewFlagSet("rollback", flag.ExitOnError)
 	namespace := fs.String("namespace", "default", "namespace of the service")
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(reorderArgs(args)); err != nil {
 		return err
 	}
 	positional := fs.Args()
@@ -148,7 +173,14 @@ func runRollback(args []string) error {
 // rolls out, waits for the new revision to become Ready, and returns its
 // name.
 func deployNewRevision(namespace, service, image, oldRev string) (string, error) {
-	patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":%q}]`, image)
+	// Always assign a fresh revision name, via "add" rather than "replace"
+	// so this works whether the current revision's name was auto-generated
+	// (metadata.name unset) or explicitly pinned (e.g. by one of the static
+	// example manifests): a "replace" on an unset path fails, and reusing
+	// an existing pinned name while changing the image is rejected by
+	// Knative's webhook as an illegal mutation of an immutable revision.
+	newRevName := fmt.Sprintf("%s-%d", service, time.Now().Unix())
+	patch := fmt.Sprintf(`[{"op":"replace","path":"/spec/template/spec/containers/0/image","value":%q},{"op":"add","path":"/spec/template/metadata/name","value":%q}]`, image, newRevName)
 	if err := kubectlRun("patch", "ksvc", service, "-n", namespace, "--type", "json", "-p", patch); err != nil {
 		return "", fmt.Errorf("patching image: %w", err)
 	}

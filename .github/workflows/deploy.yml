@@ -1,0 +1,86 @@
+name: deploy
+
+# Runs one of knative-ctl's release strategies against a cluster.
+#
+# Requires a KUBECONFIG repo secret (base64-encoded kubeconfig) pointing at
+# a cluster this runner can actually reach. GitHub-hosted runners can't
+# reach a local/home k3s node with no public ingress -- for that case,
+# run `knative-ctl` locally instead, exactly as this workflow does.
+on:
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: "Release strategy"
+        required: true
+        type: choice
+        options: [normal, canary, bluegreen, rollback]
+      service:
+        description: "Knative Service name"
+        required: true
+        default: "helloworld-go"
+      namespace:
+        description: "Namespace"
+        required: true
+        default: "knative-demo"
+      image:
+        description: "Image ref (ignored for rollback)"
+        required: false
+        default: "ghcr.io/ntlaletsi70/knative-demo-app:latest"
+      revision:
+        description: "Target revision name (rollback only)"
+        required: false
+        default: ""
+      steps:
+        description: "Canary traffic steps"
+        required: false
+        default: "10,50,100"
+      interval:
+        description: "Canary step interval"
+        required: false
+        default: "20s"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build knative-ctl
+        run: go build -o knative-ctl .
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > "$HOME/.kube/config"
+
+      - name: Deploy (normal)
+        if: ${{ inputs.strategy == 'normal' }}
+        run: |
+          kubectl apply -n "${{ inputs.namespace }}" -f examples/normal/service.yaml
+
+      - name: Deploy (canary)
+        if: ${{ inputs.strategy == 'canary' }}
+        run: |
+          ./knative-ctl canary "${{ inputs.service }}" "${{ inputs.image }}" \
+            --namespace "${{ inputs.namespace }}" \
+            --steps "${{ inputs.steps }}" \
+            --interval "${{ inputs.interval }}"
+
+      - name: Deploy (bluegreen)
+        if: ${{ inputs.strategy == 'bluegreen' }}
+        run: |
+          ./knative-ctl bluegreen "${{ inputs.service }}" "${{ inputs.image }}" \
+            --namespace "${{ inputs.namespace }}"
+
+      - name: Rollback
+        if: ${{ inputs.strategy == 'rollback' }}
+        run: |
+          ./knative-ctl rollback "${{ inputs.service }}" "${{ inputs.revision }}" \
+            --namespace "${{ inputs.namespace }}"

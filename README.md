@@ -1,9 +1,23 @@
 # knative-ctl
 
-A small standalone Go CLI for a Knative Serving + Kourier proof-of-concept:
-platform install/uninstall, plus canary and blue-green release automation
-built directly on `ksvc.spec.traffic` revision splitting (no extra
-controller like Argo Rollouts/Flagger required).
+A Knative Serving + Kourier proof-of-concept: a standalone Go CLI for
+platform install/uninstall and canary/blue-green release automation
+(built directly on `ksvc.spec.traffic` revision splitting, no extra
+controller like Argo Rollouts/Flagger required), a minimal Spring Boot demo
+app, and GitHub Actions workflows that build the app and drive the release
+flows.
+
+Layout:
+
+```
+main.go, release.go   knative-ctl CLI source
+examples/              normal / canary / bluegreen manifests, run against them
+app/                    the Spring Boot demo service
+.github/workflows/     build-app.yml (build+push), deploy.yml (release flows)
+```
+
+The demo runs in the `knative-demo` namespace (`kubectl create namespace
+knative-demo`).
 
 ## Build
 
@@ -46,6 +60,9 @@ does):
 - `autoscaling.knative.dev/scale-down-delay: "30s"` — hysteresis so a
   brief lull doesn't immediately scale back down.
 
+All three deploy `ghcr.io/ntlaletsi70/knative-demo-app` (the app in `app/`,
+see below) into the `knative-demo` namespace.
+
 **`examples/normal/`** — a plain single-revision service, 100% traffic by
 default (`spec.traffic` omitted):
 
@@ -71,6 +88,32 @@ kubectl apply -f examples/bluegreen/01-blue.yaml
 kubectl apply -f examples/bluegreen/02-green-cutover.yaml
 ```
 
+## Demo application
+
+`app/` is a minimal Spring Boot service (`spring-boot-starter-web`, one
+`GET /` endpoint returning a `TARGET` env var like the earlier Go demo
+did). `app/Dockerfile` is a two-stage Maven build producing a JRE-Alpine
+image, with the JVM tuned for a small node (`-Xmx192m`, serial GC, reduced
+JIT tiering — see the Dockerfile comment). Because a JVM needs meaningfully
+more than the earlier Go demo, the example manifests request 100m CPU /
+256Mi memory per revision (limit 500m / 384Mi) instead of the Go demo's
+50m / 32Mi.
+
+## CI workflows
+
+**`build-app.yml`** — builds `app/` and pushes to
+`ghcr.io/<owner>/knative-demo-app:latest` and `:<sha>` on every push to
+`main` touching `app/**`, or via manual dispatch. Runs on GitHub's own
+hosted runner, so it needs nothing from the local machine.
+
+**`deploy.yml`** — manual-dispatch workflow that runs one of `normal`,
+`canary`, `bluegreen`, or `rollback` via `knative-ctl` against a cluster.
+Requires a `KUBECONFIG` repository secret (base64-encoded kubeconfig)
+pointing at a cluster the GitHub-hosted runner can actually reach.
+**It cannot reach a local/home cluster with no public ingress** — for
+that case, run `knative-ctl` locally exactly as this workflow does
+internally.
+
 ## Release flows
 
 Operate on a Knative Service that's already deployed.
@@ -79,7 +122,7 @@ Operate on a Knative Service that's already deployed.
 revisions (`stable`/`canary`) for individual testability along the way:
 
 ```
-knative-ctl canary <service> <image> [--steps 10,50,100] [--interval 20s] [--namespace default]
+knative-ctl canary <service> <image> [--steps 10,50,100] [--interval 20s] [--namespace knative-demo]
 ```
 
 **Blue-green** — deploy the new revision dark (0% traffic), wait for it to
@@ -87,11 +130,11 @@ become Ready, then cut over atomically. The previous revision is retained
 at 0% for instant rollback:
 
 ```
-knative-ctl bluegreen <service> <image> [--namespace default]
+knative-ctl bluegreen <service> <image> [--namespace knative-demo]
 ```
 
 **Rollback** — flip 100% traffic to any named revision:
 
 ```
-knative-ctl rollback <service> <revision> [--namespace default]
+knative-ctl rollback <service> <revision> [--namespace knative-demo]
 ```

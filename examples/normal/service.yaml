@@ -4,12 +4,12 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: helloworld-go
-  namespace: default
+  name: knative-demo-app
+  namespace: knative-demo
 spec:
   template:
     metadata:
-      name: helloworld-go-v1
+      name: knative-demo-app-v1
       annotations:
         # kpa (Knative Pod Autoscaler, the default) is what enables true
         # scale-to-zero: at 0 replicas the activator sits in the request
@@ -29,16 +29,18 @@ spec:
         autoscaling.knative.dev/scale-down-delay: "30s"
     spec:
       containers:
-        - image: gcr.io/knative-samples/helloworld-go
+        - image: ghcr.io/ntlaletsi70/knative-demo-app:latest
           ports:
             - containerPort: 8080
           env:
             - name: TARGET
               value: "Knative PoC on blanketops"
           resources:
+            # A JVM needs meaningfully more than the Go demo did -- sized
+            # for the Dockerfile's -Xmx192m plus JVM/off-heap overhead.
             requests:
-              cpu: 50m
-              memory: 32Mi
+              cpu: 100m
+              memory: 256Mi
             limits:
-              cpu: 200m
-              memory: 128Mi
+              cpu: 500m
+              memory: 384Mi

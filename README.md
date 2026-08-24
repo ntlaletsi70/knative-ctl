@@ -7,6 +7,47 @@ controller like Argo Rollouts/Flagger required), a minimal Spring Boot demo
 app, and GitHub Actions workflows that build the app and drive the release
 flows.
 
+## Why Knative
+
+Everything below is demonstrated in this repo, not asserted — see the
+demos and manifests linked throughout.
+
+- **Scale-to-zero without dropping the request that woke it up.** At
+  `min-scale: 0`, Knative's activator sits directly in the request path:
+  it receives the first request itself, buffers it, and triggers the
+  cold start — the request that caused the scale-up is the one that gets
+  served, not lost or retried against nothing. See
+  [Demo 1](#demo-1-traffic-spike-and-autoscaling): idle at 0 replicas,
+  burst of traffic, scale-out, then back to 0 once load stops, no manual
+  intervention.
+- **Canary and blue-green are built in, not bolted on.** No Argo
+  Rollouts, no Flagger, no service mesh required — traffic splitting
+  between revisions is a native field (`spec.traffic`) on the `Service`
+  object itself. `knative-ctl` (this repo) automates both flows in
+  under 200 lines of Go on top of plain `kubectl patch` calls. See
+  [Demo 2](#demo-2-canary-and-blue-green).
+- **Every deploy is an immutable, independently-addressable Revision.**
+  Nothing gets overwritten — each rollout creates a new `Revision`
+  object, reachable on its own tagged URL even while receiving 0%
+  public traffic. Rollback is a single traffic patch back to any prior
+  revision's name, not a redeploy (`knative-ctl rollback`).
+- **Runs real, unmodified workloads.** No proprietary SDK, no
+  language-specific runtime lock-in. This PoC proves it two ways: a
+  minimal static Go binary and a full Spring Boot JVM app, same
+  platform, same CLI, same YAML shape — just a container in both cases.
+- **Close to a standard Kubernetes PodSpec, not a different API to
+  learn.** `containers` (resources, env, probes, volumeMounts),
+  `volumes`, `serviceAccountName`, `imagePullSecrets`, and — behind
+  widely-enabled feature flags — `nodeSelector`/`affinity`/`tolerations`
+  all carry straight into `spec.template.spec`. Compare
+  `examples/normal/service.yaml` to any plain Deployment pod template:
+  the diff is the `Service`/`Route` wrapper and the autoscaling
+  annotations, not the workload spec itself. Migrating an existing
+  container onto Knative is usually a small diff, not a rewrite.
+- **Lightweight by default.** This whole PoC — platform, autoscaler,
+  ingress, and two demo apps — runs on a 2-CPU/3.7GB box using Kourier
+  instead of a full Istio service mesh for ingress.
+
 Layout:
 
 ```

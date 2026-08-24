@@ -67,6 +67,14 @@ jobs:
                     env:
                       - name: TARGET
                         value: "CI e2e test"
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      seccompProfile:
+                        type: RuntimeDefault
+                      capabilities:
+                        drop:
+                          - ALL
           EOF
           kubectl wait --for=condition=Ready ksvc/knative-demo-app -n knative-demo --timeout=180s
 
@@ -76,10 +84,18 @@ jobs:
             --namespace knative-demo --steps 50,100 --interval 5s
 
       - name: Verify canary result
+        # status.traffic lags a beat behind spec.traffic after each patch
+        # (observed repeatedly against a real cluster too) -- retry rather
+        # than assume it's already converged the instant the CLI returns.
         run: |
-          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
-          echo "$traffic"
-          echo "$traffic" | grep -q '"percent":100'
+          for i in 1 2 3 4 5; do
+            traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+            echo "$traffic"
+            echo "$traffic" | grep -q '"percent":100' && exit 0
+            sleep 3
+          done
+          echo "traffic never converged to 100%"
+          exit 1
 
       - name: Test blue-green (same invocation shape as deploy.yml)
         run: |
@@ -88,10 +104,16 @@ jobs:
 
       - name: Verify blue-green result
         run: |
-          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
-          echo "$traffic"
-          echo "$traffic" | grep -q '"tag":"green"'
-          echo "$traffic" | grep -q '"tag":"blue"'
+          for i in 1 2 3 4 5; do
+            traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+            echo "$traffic"
+            if echo "$traffic" | grep -q '"tag":"green"' && echo "$traffic" | grep -q '"tag":"blue"'; then
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "traffic never converged to green/blue"
+          exit 1
 
       - name: Test rollback (same invocation shape as deploy.yml)
         run: |
@@ -100,6 +122,11 @@ jobs:
 
       - name: Verify rollback result
         run: |
-          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
-          echo "$traffic"
-          echo "$traffic" | grep -q '"tag":"rollback"'
+          for i in 1 2 3 4 5; do
+            traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+            echo "$traffic"
+            echo "$traffic" | grep -q '"tag":"rollback"' && exit 0
+            sleep 3
+          done
+          echo "traffic never converged to rollback"
+          exit 1

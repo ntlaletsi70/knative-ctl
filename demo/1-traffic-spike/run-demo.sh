@@ -25,6 +25,17 @@ pods() {
   kubectl get pods -n "$NS" -l "serving.knative.dev/service=$SVC" --no-headers 2>/dev/null | wc -l || true
 }
 
+echo "============================================================"
+echo " Demo 1: traffic spike and autoscaling"
+echo
+echo " What you're about to see: the '${SVC}' Knative Service sitting"
+echo " idle at 0 replicas, a burst of ${WORKERS} concurrent requests"
+echo " hitting it, the activator triggering scale-out on demand (watch"
+echo " the k9s pane above), and it scaling back down to 0 once the"
+echo " load stops -- no HPA, no external metrics, no manual scaling."
+echo "============================================================"
+sleep 3
+
 for i in 1 2 3 4 5; do
   kubectl get ksvc "$SVC" -n "$NS" >/dev/null 2>&1 && break
   sleep 2

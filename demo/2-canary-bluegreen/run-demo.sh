@@ -27,6 +27,19 @@ step() {
 # after heavy concurrent cluster load): retry the initial lookup a few
 # times before handing off to knative-ctl, which has no retry of its own
 # for this call.
+echo "============================================================"
+echo " Demo 2: canary and blue-green release flows"
+echo
+echo " What you're about to see: knative-ctl driving two release"
+echo " strategies against the '${SVC}' Knative Service, both built"
+echo " directly on spec.traffic revision splitting -- no Argo"
+echo " Rollouts, no Flagger, no service mesh. First a progressive"
+echo " canary (10% -> 50% -> 100%), then a blue-green dark-deploy and"
+echo " atomic cutover. Watch the k9s pane above for the new revision's"
+echo " pod appearing before traffic ever reaches it."
+echo "============================================================"
+sleep 3
+
 for i in 1 2 3 4 5; do
   kubectl get ksvc "$SVC" -n "$NS" >/dev/null 2>&1 && break
   sleep 2

@@ -42,6 +42,14 @@ spec:
             limits:
               cpu: 500m
               memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
   traffic:
     - revisionName: knative-demo-app-v1
       percent: 80

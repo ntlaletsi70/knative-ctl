@@ -44,3 +44,14 @@ spec:
             limits:
               cpu: 500m
               memory: 384Mi
+          # Restricted Pod Security Standard baseline -- silences Knative's
+          # own "insecure default" admission warning and matches how the
+          # Dockerfile already runs the JVM as a non-root `app` user.
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL

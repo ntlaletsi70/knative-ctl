@@ -7,9 +7,12 @@ RUN mvn -q -B package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN addgroup -S app && adduser -S app -G app
+# Numeric UID/GID, not a named user: Kubernetes' runAsNonRoot check can't
+# introspect /etc/passwd inside the image, so a named USER can't be
+# verified as non-root and fails with CreateContainerConfigError.
+RUN addgroup -S -g 1000 app && adduser -S -u 1000 app -G app
 COPY --from=build /build/target/knative-demo-app-*.jar app.jar
-USER app
+USER 1000:1000
 EXPOSE 8080
 # Tuned for a small/resource-constrained node: cap heap, use the serial GC
 # (lower footprint than the default G1 for a small single-threaded-ish

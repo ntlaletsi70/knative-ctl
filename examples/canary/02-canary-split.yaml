@@ -4,11 +4,12 @@
 # without that, Knative auto-generates revision names and you'd have to
 # look up the new one after applying before you could reference it here.
 #
-# The v2 image is the same ghcr.io/ntlaletsi70/knative-demo-app:latest
-# build as v1 (only one version has been published by CI so far) -- once
-# build-app.yml has produced more than one tag, point v2 at a real
-# ":<sha>" tag instead. The env var change alone is enough to prove which
-# revision served a given request while testing this split.
+# The v2 image is the same ttl.sh/... build as v1 (see the image line
+# below for why this repo points at ttl.sh instead of its own ghcr.io
+# image, and its 24h TTL) -- once you have more than one real build,
+# point v2 at a distinct ":<sha>" tag instead. The env var change alone
+# is enough to prove which revision served a given request while testing
+# this split.
 #
 # Apply with: kubectl apply -f examples/canary/02-canary-split.yaml
 apiVersion: serving.knative.dev/v1
@@ -29,7 +30,7 @@ spec:
         autoscaling.knative.dev/scale-down-delay: "30s"
     spec:
       containers:
-        - image: ghcr.io/ntlaletsi70/knative-demo-app:latest
+        - image: ttl.sh/knative-demo-app-c0c8efd860cd8f667df40e13e681dbfe3a0ec1fe:24h  # ttl.sh, 24h TTL from build -- see README for why (GHCR access blocked), rebuild via build-app.yml if expired
           ports:
             - containerPort: 8080
           env:

@@ -161,7 +161,9 @@ func installKourier(version string) error {
 	if err := applyWithRetry(m); err != nil {
 		return err
 	}
-	if err := kubectlRun("rollout", "status", "deployment/net-kourier-controller", "-n", "kourier-system", "--timeout=120s"); err != nil {
+	// net-kourier-controller is deployed into knative-serving by kourier.yaml,
+	// not kourier-system -- only the gateway lands there.
+	if err := kubectlRun("rollout", "status", "deployment/net-kourier-controller", "-n", "knative-serving", "--timeout=120s"); err != nil {
 		return fmt.Errorf("waiting for deployment/net-kourier-controller: %w", err)
 	}
 	if err := kubectlRun("rollout", "status", "deployment/3scale-kourier-gateway", "-n", "kourier-system", "--timeout=120s"); err != nil {

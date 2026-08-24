@@ -19,19 +19,36 @@ app/                    the Spring Boot demo service
 The demo runs in the `knative-demo` namespace (`kubectl create namespace
 knative-demo`).
 
-## Demo
+## Demos
 
-![canary and blue-green demo](demo/demo.gif)
+Both are two-pane recordings: `k9s` watching `knative-demo` (top) beside
+a scripted `bash` run driving the actual commands (bottom). Recorded with
+`asciinema` + `agg` inside a `screen` split.
 
-Two-pane recording: `k9s` watching `knative-demo` (top) alongside a
-scripted run of `knative-ctl canary` then `knative-ctl bluegreen` against
-the demo service (bottom). Recorded with `asciinema` + `agg` inside a
-`screen` split (`demo/screenrc`, `demo/run-demo.sh`) — re-run it yourself
-with:
+### Demo 1: traffic spike and autoscaling
+
+![traffic spike and autoscaling demo](demo/1-traffic-spike/demo.gif)
+
+Service idle at 0 replicas, a burst of concurrent requests triggers
+scale-out through the activator (`autoscaling.knative.dev/min-scale: "0"`,
+see the annotations above), then it scales back down to zero once the
+load stops. Re-run it yourself with:
 
 ```
-asciinema rec demo/demo.cast -c "screen -c demo/screenrc"
-agg demo/demo.cast demo/demo.gif
+asciinema rec demo/1-traffic-spike/demo.cast -c "screen -c demo/1-traffic-spike/screenrc"
+agg demo/1-traffic-spike/demo.cast demo/1-traffic-spike/demo.gif
+```
+
+### Demo 2: canary and blue-green
+
+![canary and blue-green demo](demo/2-canary-bluegreen/demo.gif)
+
+A scripted run of `knative-ctl canary` then `knative-ctl bluegreen`
+against the demo service. Re-run it yourself with:
+
+```
+asciinema rec demo/2-canary-bluegreen/demo.cast -c "screen -c demo/2-canary-bluegreen/screenrc"
+agg demo/2-canary-bluegreen/demo.cast demo/2-canary-bluegreen/demo.gif
 ```
 
 ## Build

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Scripted demo run for the bottom pane of demo/screenrc. Not meant to be
-# run standalone outside that layout (it calls `screen -X quit` at the end
-# to stop the whole recording session, k9s pane included).
+# Scripted demo run for the bottom pane of demo/2-canary-bluegreen/screenrc.
+# Not meant to be run standalone outside that layout (it calls
+# `screen -X quit` at the end to stop the whole recording session, k9s
+# pane included).
 set -euo pipefail
 
 CTL=/home/blanketops/knative-ctl/knative-ctl

@@ -33,3 +33,4 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/knative-demo-app:latest
             ghcr.io/${{ github.repository_owner }}/knative-demo-app:${{ github.sha }}
+            ttl.sh/knative-demo-app-${{ github.sha }}:24h

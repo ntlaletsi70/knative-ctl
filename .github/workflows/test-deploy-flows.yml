@@ -1,0 +1,105 @@
+name: test-deploy-flows
+
+# End-to-end test of the release flows deploy.yml exposes. deploy.yml
+# itself needs a KUBECONFIG secret pointing at a cluster the runner can
+# reach, which we don't have (no public ingress on the only cluster this
+# has been tested against). So instead of faking that, this spins up a
+# real, disposable kind cluster on the runner and drives knative-ctl with
+# the exact same command shapes deploy.yml uses (flags after the
+# positional <service> <image> args) -- which also makes this a
+# regression test for the flag-parsing bug fixed in e3de2c2 (flags placed
+# after positional args were silently dropped).
+#
+# Uses gcr.io/knative-samples/helloworld-go throughout rather than this
+# repo's own ghcr.io/ttl.sh images, so the test doesn't depend on
+# registry access that's unrelated to what it's actually verifying.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "main.go"
+      - "release.go"
+      - "go.mod"
+      - ".github/workflows/deploy.yml"
+      - ".github/workflows/test-deploy-flows.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build knative-ctl
+        run: go build -o knative-ctl .
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: knative-ctl-e2e
+
+      - name: Install Knative + Kourier
+        run: ./knative-ctl install all
+
+      - name: Deploy baseline service
+        run: |
+          kubectl create namespace knative-demo
+          kubectl apply -n knative-demo -f - <<'EOF'
+          apiVersion: serving.knative.dev/v1
+          kind: Service
+          metadata:
+            name: knative-demo-app
+            namespace: knative-demo
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: gcr.io/knative-samples/helloworld-go
+                    ports:
+                      - containerPort: 8080
+                    env:
+                      - name: TARGET
+                        value: "CI e2e test"
+          EOF
+          kubectl wait --for=condition=Ready ksvc/knative-demo-app -n knative-demo --timeout=180s
+
+      - name: Test canary (same invocation shape as deploy.yml)
+        run: |
+          ./knative-ctl canary knative-demo-app gcr.io/knative-samples/helloworld-go \
+            --namespace knative-demo --steps 50,100 --interval 5s
+
+      - name: Verify canary result
+        run: |
+          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+          echo "$traffic"
+          echo "$traffic" | grep -q '"percent":100'
+
+      - name: Test blue-green (same invocation shape as deploy.yml)
+        run: |
+          ./knative-ctl bluegreen knative-demo-app gcr.io/knative-samples/helloworld-go \
+            --namespace knative-demo
+
+      - name: Verify blue-green result
+        run: |
+          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+          echo "$traffic"
+          echo "$traffic" | grep -q '"tag":"green"'
+          echo "$traffic" | grep -q '"tag":"blue"'
+
+      - name: Test rollback (same invocation shape as deploy.yml)
+        run: |
+          blue=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic[?(@.tag=="blue")].revisionName}')
+          ./knative-ctl rollback knative-demo-app "$blue" --namespace knative-demo
+
+      - name: Verify rollback result
+        run: |
+          traffic=$(kubectl get ksvc knative-demo-app -n knative-demo -o jsonpath='{.status.traffic}')
+          echo "$traffic"
+          echo "$traffic" | grep -q '"tag":"rollback"'

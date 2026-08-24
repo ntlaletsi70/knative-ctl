@@ -8,8 +8,13 @@ set -euo pipefail
 CTL=/home/blanketops/knative-ctl/knative-ctl
 NS=knative-demo
 SVC=knative-demo-app
-GO_IMAGE_V2="gcr.io/knative-samples/helloworld-go@sha256:da76ee72d7f2e251267af3b6e53e2a1325c385b272b790b7fcbd1363ee1cb482"
-GO_IMAGE_V3="gcr.io/knative-samples/helloworld-go@sha256:b9452976281b790fd56cbae50e5e22003a9bd0a296425fe42256e78a2dd96e2e"
+# Same image reused for both steps -- knative-ctl always assigns a fresh
+# revision name regardless of image identity, so this still exercises the
+# real traffic-splitting mechanics. Reusing it (rather than building a
+# distinct v2) also means the image is already cached on this node from
+# the initial deploy, keeping each step's cold start to JVM boot time only
+# (no re-pull).
+APP_IMAGE="ttl.sh/knative-demo-app-726e5d978eac0a8ed1ecf204ec2bbc440310128d:24h"
 
 step() {
   echo
@@ -28,14 +33,14 @@ for i in 1 2 3 4 5; do
 done
 
 step "knative-ctl demo: canary release"
-"$CTL" canary "$SVC" "$GO_IMAGE_V2" --namespace "$NS" --steps 10,50,100 --interval 8s
+"$CTL" canary "$SVC" "$APP_IMAGE" --namespace "$NS" --steps 10,50,100 --interval 8s
 
 step "canary complete -- current traffic split"
 kubectl get ksvc "$SVC" -n "$NS" -o jsonpath='{.status.traffic}' | python3 -m json.tool
 sleep 4
 
 step "knative-ctl demo: blue-green release"
-"$CTL" bluegreen "$SVC" "$GO_IMAGE_V3" --namespace "$NS"
+"$CTL" bluegreen "$SVC" "$APP_IMAGE" --namespace "$NS"
 
 step "blue-green complete -- current traffic split"
 kubectl get ksvc "$SVC" -n "$NS" -o jsonpath='{.status.traffic}' | python3 -m json.tool

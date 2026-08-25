@@ -67,9 +67,15 @@ jobs:
                     env:
                       - name: TARGET
                         value: "CI e2e test"
+                    # No runAsNonRoot here, unlike this repo's own
+                    # examples/*.yaml: gcr.io/knative-samples/helloworld-go
+                    # is a third-party image that genuinely runs as root by
+                    # default (confirmed via CreateContainerConfigError --
+                    # "container has runAsNonRoot and image will run as
+                    # root" -- when this was tried), unlike app/Dockerfile,
+                    # which we control and fixed to run as UID 1000.
                     securityContext:
                       allowPrivilegeEscalation: false
-                      runAsNonRoot: true
                       seccompProfile:
                         type: RuntimeDefault
                       capabilities:

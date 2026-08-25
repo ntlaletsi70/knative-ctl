@@ -23,9 +23,9 @@ demos and manifests linked throughout.
 - **Canary and blue-green are built in, not bolted on.** No Argo
   Rollouts, no Flagger, no service mesh required — traffic splitting
   between revisions is a native field (`spec.traffic`) on the `Service`
-  object itself. `knative-ctl` (this repo) automates both flows in
-  under 200 lines of Go on top of plain `kubectl patch` calls. See
-  [Demo 2](#demo-2-canary-and-blue-green).
+  object itself. `knative-ctl` (this repo) automates both flows on top
+  of plain `kubectl patch` calls, no additional controller running in
+  the cluster. See [Demo 2](#demo-2-canary-and-blue-green).
 - **Every deploy is an immutable, independently-addressable Revision.**
   Nothing gets overwritten — each rollout creates a new `Revision`
   object, reachable on its own tagged URL even while receiving 0%
@@ -54,7 +54,9 @@ Layout:
 main.go, release.go   knative-ctl CLI source
 examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
-.github/workflows/     build-app.yml (build+push), deploy.yml (release flows)
+demo/                   recorded GIF demos embedded above, and the scripts that made them
+.github/workflows/     build-app.yml (build+push), deploy.yml (release flows),
+                       test-deploy-flows.yml (e2e test of the release flows)
 ```
 
 The demo runs in the `knative-demo` namespace (`kubectl create namespace
@@ -133,8 +135,11 @@ does):
 - `autoscaling.knative.dev/scale-down-delay: "30s"` — hysteresis so a
   brief lull doesn't immediately scale back down.
 
-All three deploy `ghcr.io/ntlaletsi70/knative-demo-app` (the app in `app/`,
-see below) into the `knative-demo` namespace.
+All three deploy the app in `app/` (see below) into the `knative-demo`
+namespace, currently pinned to a `ttl.sh/knative-demo-app-<sha>:24h`
+build rather than this repo's own `ghcr.io/ntlaletsi70/knative-demo-app`
+image — see the CI workflows section for why, and swap back to the
+`ghcr.io` reference once that's resolved.
 
 **`examples/normal/`** — a plain single-revision service, 100% traffic by
 default (`spec.traffic` omitted):
@@ -175,9 +180,20 @@ more than the earlier Go demo, the example manifests request 100m CPU /
 ## CI workflows
 
 **`build-app.yml`** — builds `app/` and pushes to
-`ghcr.io/<owner>/knative-demo-app:latest` and `:<sha>` on every push to
+`ghcr.io/<owner>/knative-demo-app:latest`/`:<sha>` on every push to
 `main` touching `app/**`, or via manual dispatch. Runs on GitHub's own
-hosted runner, so it needs nothing from the local machine.
+hosted runner, so it needs nothing from the local machine. It also
+pushes to `ttl.sh/knative-demo-app-<sha>:24h` — the `ghcr.io` package
+was created back when this repo was private and inherited that access
+(a known GHCR gotcha: a package's "inherit access from source repo"
+setting is sticky and doesn't re-sync just because the repo's own
+visibility changes later, even with the package's own visibility set to
+public), so it's still not anonymously pullable even now that the repo
+is public. `ttl.sh` needs no auth for push or pull at all, so the example
+manifests are pinned to it for now. It's anonymous/ephemeral and the tag
+expires 24h after build — re-run this workflow to refresh it, and swap
+`examples/*.yaml` back to the `ghcr.io` reference once the package's own
+access setting is fixed.
 
 **`deploy.yml`** — manual-dispatch workflow that runs one of `normal`,
 `canary`, `bluegreen`, or `rollback` via `knative-ctl` against a cluster.
@@ -186,6 +202,18 @@ pointing at a cluster the GitHub-hosted runner can actually reach.
 **It cannot reach a local/home cluster with no public ingress** — for
 that case, run `knative-ctl` locally exactly as this workflow does
 internally.
+
+**`test-deploy-flows.yml`** — a real end-to-end test of the release flows
+`deploy.yml` exposes, since `deploy.yml` itself can't be exercised
+against a cluster this project doesn't have public access to. Spins up a
+disposable `kind` cluster on the runner, installs Knative + Kourier via
+`knative-ctl install all`, then runs `canary`, `bluegreen`, and
+`rollback` with the exact same command shape `deploy.yml` uses (flags
+after the positional `<service> <image>` args) — so it doubles as a
+regression test for a real bug this repo shipped and fixed (flags in
+that position were silently dropped; see the git history on `release.go`
+for the full story). Runs on every push touching the CLI source or
+either workflow file, or via manual dispatch.
 
 ## Release flows
 

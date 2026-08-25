@@ -114,6 +114,52 @@ knative-ctl uninstall knative|kourier|all [--version knative-vX.Y.Z]
 class. Applies are retried once on transient failure (CRD establishment can
 briefly time out under load).
 
+## Front door: nginx-ingress + MetalLB + Kourier
+
+Experimental, verified working end-to-end but not yet wired into this
+repo's own manifests (see note below). Kourier's own external
+`LoadBalancer` is reverted to `ClusterIP`-only; `nginx-ingress` is the
+single external entry point instead, reached via a real LAN IP from
+MetalLB rather than the node's own address:
+
+```
+        client (LAN)
+             │
+             │ curl -H "Host: <svc>.<ns>.svc.cluster.local" http://192.168.0.200/
+             ▼
+   ┌───────────────────────┐
+   │  MetalLB (L2 / ARP)    │  pool 192.168.0.200-210, hands out .200
+   └───────────┬────────────┘
+               ▼
+   ┌───────────────────────┐
+   │  ingress-nginx          │  north-south front door (LoadBalancer :80/:443)
+   │  --default-backend-     │  passthrough, Host header preserved,
+   │   service=kourier-      │  no per-service Ingress objects
+   │   system/kourier-internal│
+   └───────────┬────────────┘
+               ▼
+   ┌───────────────────────┐
+   │  kourier-internal        │  ClusterIP — also the direct entry point
+   │  (3scale-kourier-gateway)│  for east-west (pod-to-pod) traffic,
+   └───────────┬────────────┘  which never touches nginx-ingress at all
+               ▼
+   ┌───────────────────────┐
+   │  Knative Revision        │  activator sits here at scale=0
+   └───────────────────────┘
+```
+
+Kourier is the only thing doing actual Knative routing (host matching,
+traffic splitting) in either direction — `nginx-ingress` is purely a
+front door bolted onto its north-south side, not a second routing
+plane. `cert-manager` is also installed for a later self-signed
+`ClusterIssuer`, but TLS termination on the front door is deliberately
+not wired up yet.
+
+The manifests for this (`ingress-nginx`, `metallb`, `metallb-pool`,
+`cert-manager`) are currently applied straight from upstream releases
+rather than checked into `examples/` — ask before assuming they're
+part of a fresh clone of this repo.
+
 ## Example manifests
 
 Each folder is a self-contained, directly `kubectl apply`-able sequence for

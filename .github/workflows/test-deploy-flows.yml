@@ -76,7 +76,14 @@ jobs:
                         drop:
                           - ALL
           EOF
-          kubectl wait --for=condition=Ready ksvc/knative-demo-app -n knative-demo --timeout=180s
+          kubectl wait --for=condition=Ready ksvc/knative-demo-app -n knative-demo --timeout=300s
+
+      - name: Dump diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods -A
+          kubectl get ksvc,revision -n knative-demo -o wide
+          kubectl describe pod -n knative-demo -l serving.knative.dev/service=knative-demo-app || true
 
       - name: Test canary (same invocation shape as deploy.yml)
         run: |

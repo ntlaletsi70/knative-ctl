@@ -15,7 +15,7 @@ spec:
         autoscaling.knative.dev/max-scale: "1"
     spec:
       containers:
-        - image: ttl.sh/eventing-demo-receiver-2749d39cef0ce78cdf1320dc8c935c57020c806c:24h
+        - image: ttl.sh/eventing-demo-receiver-45fa63c92a0b387f72657ada51f2015bbdd72da0:24h
           env:
             - name: BROKER_URL
               value: http://broker-ingress.knative-eventing.svc.cluster.local/knative-demo/default

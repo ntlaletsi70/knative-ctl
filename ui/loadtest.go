@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -67,6 +68,8 @@ func loadtestStreamHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var total, errs int64
+	var firstErr string
+	var firstErrOnce sync.Once
 	client := &http.Client{Timeout: 5 * time.Second}
 
 	for i := 0; i < workers; i++ {
@@ -85,6 +88,7 @@ func loadtestStreamHandler(w http.ResponseWriter, r *http.Request) {
 				resp, err := client.Do(req)
 				if err != nil {
 					atomic.AddInt64(&errs, 1)
+					firstErrOnce.Do(func() { firstErr = err.Error() })
 					continue
 				}
 				resp.Body.Close()
@@ -100,18 +104,25 @@ func loadtestStreamHandler(w http.ResponseWriter, r *http.Request) {
 	defer ticker.Stop()
 	start := time.Now()
 
+	errSuffix := func() string {
+		if firstErr == "" {
+			return ""
+		}
+		return " (e.g. " + firstErr + ")"
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Fprintf(w, "data: t+%ds: %d requests sent, %d errors\n\n",
-				int(time.Since(start).Seconds()), atomic.LoadInt64(&total), atomic.LoadInt64(&errs))
-			fmt.Fprintf(w, "event: done\ndata: %d total, %d errors\n\n",
-				atomic.LoadInt64(&total), atomic.LoadInt64(&errs))
+			fmt.Fprintf(w, "data: t+%ds: %d requests sent, %d errors%s\n\n",
+				int(time.Since(start).Seconds()), atomic.LoadInt64(&total), atomic.LoadInt64(&errs), errSuffix())
+			fmt.Fprintf(w, "event: done\ndata: %d total, %d errors%s\n\n",
+				atomic.LoadInt64(&total), atomic.LoadInt64(&errs), errSuffix())
 			flusher.Flush()
 			return
 		case <-ticker.C:
-			fmt.Fprintf(w, "data: t+%ds: %d requests sent, %d errors\n\n",
-				int(time.Since(start).Seconds()), atomic.LoadInt64(&total), atomic.LoadInt64(&errs))
+			fmt.Fprintf(w, "data: t+%ds: %d requests sent, %d errors%s\n\n",
+				int(time.Since(start).Seconds()), atomic.LoadInt64(&total), atomic.LoadInt64(&errs), errSuffix())
 			flusher.Flush()
 		}
 	}

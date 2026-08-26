@@ -94,4 +94,31 @@ Images are built by `.github/workflows/build-eventing-demo.yml`
   pointed at the `tailscale funnel` URL. GitHub's automatic `ping`
   delivery on webhook creation arrived for real, over the actual
   public internet, and routed correctly to `push-handler` via
-  `ping-trigger`.
+  `ping-trigger`. A follow-up commit's real `push` delivery arrived
+  the same way, with the actual commit SHA/author/file list intact.
+
+## Resource footprint on this hardware
+
+This is what actually answered "can this cluster take Knative
+Eventing" (see the top-level README's own resource notes for the
+2 CPU / 3.7GB baseline): Eventing core + MT Channel Broker +
+InMemoryChannel is 9 pods on its own. Installing it alongside Serving +
+Kourier pushed `kubectl describe node` to **89% CPU requests committed
+(~1780m of ~2000m, ~220m headroom)**, with **swap essentially maxed
+(511/511Mi)** and ~1.2Gi memory available. Stable and working at that
+level — zero restarts on anything installed today — but genuinely at
+the ceiling, not comfortable margin. Two concrete things this forced:
+
+- Tekton + Shipwright (an earlier, abandoned direction this session)
+  had to be fully uninstalled first — Kourier's own gateway pod hit a
+  hard `Insufficient cpu` scheduling failure otherwise, unrelated to
+  memory.
+- Even after that, Kourier's gateway `Deployment` needed its own CPU
+  *request* trimmed from `200m` to `100m` by hand to close the last
+  ~25m gap and let it schedule at all.
+
+`push-handler`/`pr-handler` staying `min-scale: 0` (scaling to zero
+between events) is load-bearing here, not just a nicety — it's part of
+what keeps this fitting at all. Adding another always-on subscriber or
+any heavier workload would likely need something else removed first,
+the same trade this session already made once.

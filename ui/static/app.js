@@ -7,6 +7,10 @@ const stepsFields = document.querySelectorAll(".field-steps");
 const form = document.getElementById("release-form");
 const runBtn = document.getElementById("run-btn");
 const logEl = document.getElementById("release-log");
+const serviceInput = document.getElementById("service");
+const releaseNsInput = document.getElementById("namespace");
+const imageOptions = document.getElementById("image-options");
+const revisionOptions = document.getElementById("revision-options");
 
 function syncFieldsToAction() {
   const action = actionEl.value;
@@ -16,6 +20,44 @@ function syncFieldsToAction() {
 }
 actionEl.addEventListener("change", syncFieldsToAction);
 syncFieldsToAction();
+
+// Past revisions' images/names are exactly what's actually deployable --
+// already built, already pulled -- more useful to pick from than typing
+// a tag from memory. <datalist> keeps the field free-text too, for a
+// brand new image that hasn't been deployed yet.
+async function refreshRevisions() {
+  const service = serviceInput.value.trim();
+  const namespace = releaseNsInput.value.trim() || "knative-demo";
+  if (!service) return;
+  try {
+    const res = await fetch(
+      "/api/revisions?service=" + encodeURIComponent(service) +
+      "&namespace=" + encodeURIComponent(namespace)
+    );
+    if (!res.ok) return;
+    const revs = await res.json();
+    imageOptions.innerHTML = "";
+    revisionOptions.innerHTML = "";
+    const seenImages = new Set();
+    for (const rev of revs) {
+      if (rev.image && !seenImages.has(rev.image)) {
+        seenImages.add(rev.image);
+        const opt = document.createElement("option");
+        opt.value = rev.image;
+        imageOptions.appendChild(opt);
+      }
+      const opt = document.createElement("option");
+      opt.value = rev.name;
+      opt.label = rev.ready ? "ready" : "not ready";
+      revisionOptions.appendChild(opt);
+    }
+  } catch {
+    // best-effort -- the fields stay free-text either way
+  }
+}
+serviceInput.addEventListener("change", refreshRevisions);
+releaseNsInput.addEventListener("change", refreshRevisions);
+refreshRevisions();
 
 let releaseSource = null;
 
@@ -123,3 +165,34 @@ function formatAge(secs) {
 
 nsInput.addEventListener("change", () => connectPods(nsInput.value || "knative-demo"));
 connectPods(nsInput.value || "knative-demo");
+
+// -- Traffic spike ---------------------------------------------------------
+
+const loadtestForm = document.getElementById("loadtest-form");
+const loadtestBtn = document.getElementById("loadtest-btn");
+const loadtestLog = document.getElementById("loadtest-log");
+let loadtestSource = null;
+
+loadtestForm.addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  if (loadtestSource) loadtestSource.close();
+
+  const params = new URLSearchParams(new FormData(loadtestForm));
+  loadtestLog.textContent = "";
+  loadtestBtn.disabled = true;
+
+  loadtestSource = new EventSource("/api/loadtest/stream?" + params.toString());
+  loadtestSource.onmessage = (ev) => {
+    loadtestLog.textContent += ev.data + "\n";
+    loadtestLog.scrollTop = loadtestLog.scrollHeight;
+  };
+  loadtestSource.addEventListener("done", (ev) => {
+    loadtestLog.textContent += "\n-- done: " + ev.data + " --\n";
+    loadtestBtn.disabled = false;
+    loadtestSource.close();
+  });
+  loadtestSource.onerror = () => {
+    loadtestBtn.disabled = false;
+    loadtestSource.close();
+  };
+});

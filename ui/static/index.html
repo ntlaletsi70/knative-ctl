@@ -33,11 +33,13 @@
         </label>
         <label class="field-image">
           Image
-          <input type="text" id="image" name="image" placeholder="ttl.sh/knative-demo-app-<sha>:24h">
+          <input type="text" id="image" name="image" list="image-options" placeholder="ttl.sh/knative-demo-app-<sha>:24h">
+          <datalist id="image-options"></datalist>
         </label>
         <label class="field-revision" hidden>
           Revision
-          <input type="text" id="revision" name="revision" placeholder="knative-demo-app-1787644068">
+          <input type="text" id="revision" name="revision" list="revision-options" placeholder="knative-demo-app-1787644068">
+          <datalist id="revision-options"></datalist>
         </label>
         <label class="field-steps">
           Steps
@@ -55,6 +57,31 @@
     <section class="panel" id="pods-panel">
       <h2>Pods <span id="pods-namespace-label">(knative-demo)</span></h2>
       <div id="pods-grid"></div>
+
+      <h2 class="section-spacer">Traffic Spike</h2>
+      <form id="loadtest-form">
+        <label>
+          Namespace
+          <input type="text" id="lt-namespace" name="namespace" value="knative-demo">
+        </label>
+        <label>
+          Service
+          <input type="text" id="lt-service" name="service" value="knative-demo-app" required>
+        </label>
+        <label>
+          Workers
+          <input type="number" id="lt-workers" name="workers" value="15" min="1" max="50">
+        </label>
+        <label>
+          Duration (s)
+          <input type="number" id="lt-duration" name="duration" value="25" min="1" max="120">
+        </label>
+        <button type="submit" id="loadtest-btn">Fire</button>
+      </form>
+      <pre id="loadtest-log" aria-live="polite"></pre>
+      <p class="hint">Only reaches the service when this dashboard runs
+        in-cluster (kourier-internal isn't reachable from outside). Watch
+        the pods above scale out live.</p>
     </section>
   </main>
 

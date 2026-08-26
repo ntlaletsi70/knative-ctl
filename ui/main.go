@@ -30,6 +30,8 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(staticSub)))
 	mux.HandleFunc("/api/pods/stream", podsStreamHandler)
 	mux.HandleFunc("/api/release/stream", releaseStreamHandler(*kctlPath))
+	mux.HandleFunc("/api/revisions", revisionsHandler)
+	mux.HandleFunc("/api/loadtest/stream", loadtestStreamHandler)
 
 	log.Printf("knative-ctl dashboard on http://%s (knative-ctl: %s)", *addr, *kctlPath)
 	log.Fatal(http.ListenAndServe(*addr, mux))

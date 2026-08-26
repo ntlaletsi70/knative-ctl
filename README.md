@@ -56,6 +56,7 @@ examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
 infra/ingress/          nginx-ingress + MetalLB + cert-manager manifests, see below
+infra/tailscale/        external access setup, no cloud NLB required
 .github/workflows/     build-app.yml (build+push), deploy.yml (release flows),
                        test-deploy-flows.yml (e2e test of the release flows)
 ```
@@ -117,8 +118,7 @@ briefly time out under load).
 
 ## Front door: nginx-ingress + MetalLB + Kourier
 
-Experimental, verified working end-to-end but not yet wired into this
-repo's own manifests (see note below). Kourier's own external
+Verified working end-to-end. Kourier's own external
 `LoadBalancer` is reverted to `ClusterIP`-only; `nginx-ingress` is the
 single external entry point instead, reached via a real LAN IP from
 MetalLB rather than the node's own address:
@@ -159,6 +159,31 @@ shared root, so clients need `-k`/`--insecure` or equivalent.
 
 Manifests and the cluster-level setup steps for this are in
 [`infra/ingress/`](infra/ingress/).
+
+### External access without a cloud NLB
+
+No cloud budget for a real external load balancer, so
+[`infra/tailscale/`](infra/tailscale/) uses Tailscale as a substitute:
+`tailscaled` joins this node to an existing tailnet, and `tailscale
+serve` proxies a standard HTTPS endpoint (a real, trusted
+Tailscale-issued cert, no `-k` needed) straight to `nginx-ingress`'s
+local NodePort — private, authenticated mesh, not public internet
+exposure.
+
+```
+   phone (different network) ── tailnet ──▶ node's tailscale0 ── tailscale serve ──▶ nginx-ingress NodePort
+                                                                          │
+                                                                          └── same passthrough → kourier-internal → Revision path above
+```
+
+Verified from a phone on a separate network entirely (cellular, not
+this LAN):
+
+```
+curl -H "Host: knative-demo-app.knative-demo.svc.cluster.local" https://blanketops.tailf8145.ts.net/
+```
+
+returned `200` with the real app response.
 
 ## Example manifests
 

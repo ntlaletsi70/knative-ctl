@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>knative-ctl dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>knative-ctl</h1>
+    <span class="subtitle">release control + live pod scaling</span>
+  </header>
+
+  <main>
+    <section class="panel" id="release-panel">
+      <h2>Release</h2>
+      <form id="release-form">
+        <label>
+          Action
+          <select id="action" name="action">
+            <option value="canary">canary</option>
+            <option value="bluegreen">bluegreen</option>
+            <option value="rollback">rollback</option>
+          </select>
+        </label>
+        <label>
+          Namespace
+          <input type="text" id="namespace" name="namespace" value="knative-demo">
+        </label>
+        <label>
+          Service
+          <input type="text" id="service" name="service" value="knative-demo-app" required>
+        </label>
+        <label class="field-image">
+          Image
+          <input type="text" id="image" name="image" placeholder="ttl.sh/knative-demo-app-<sha>:24h">
+        </label>
+        <label class="field-revision" hidden>
+          Revision
+          <input type="text" id="revision" name="revision" placeholder="knative-demo-app-1787644068">
+        </label>
+        <label class="field-steps">
+          Steps
+          <input type="text" id="steps" name="steps" value="10,50,100">
+        </label>
+        <label class="field-steps">
+          Interval
+          <input type="text" id="interval" name="interval" value="20s">
+        </label>
+        <button type="submit" id="run-btn">Run</button>
+      </form>
+      <pre id="release-log" aria-live="polite"></pre>
+    </section>
+
+    <section class="panel" id="pods-panel">
+      <h2>Pods <span id="pods-namespace-label">(knative-demo)</span></h2>
+      <div id="pods-grid"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

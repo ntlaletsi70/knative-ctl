@@ -57,6 +57,7 @@ app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
 infra/ingress/          nginx-ingress + MetalLB + cert-manager manifests, see below
 infra/tailscale/        external access setup, no cloud NLB required
+ui/                      local dashboard: trigger releases, watch pods scale live
 .github/workflows/     build-app.yml (build+push), deploy.yml (release flows),
                        test-deploy-flows.yml (e2e test of the release flows)
 ```
@@ -310,3 +311,17 @@ knative-ctl bluegreen <service> <image> [--namespace knative-demo]
 ```
 knative-ctl rollback <service> <revision> [--namespace knative-demo]
 ```
+
+## Dashboard
+
+All three release flows above, plus a live view of pods scaling
+up/down as they happen, from a local web UI instead of the CLI. See
+[`ui/`](ui/):
+
+```
+go build -o knative-ui ./ui
+./knative-ui   # http://127.0.0.1:8090
+```
+
+It shells out to the `knative-ctl` binary and streams its output —
+same release logic, one place, not reimplemented.

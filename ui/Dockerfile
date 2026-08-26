@@ -24,6 +24,6 @@ COPY --from=build /out/knative-ui /usr/local/bin/knative-ui
 COPY ui/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-USER app
+USER 1000
 WORKDIR /home/app
 ENTRYPOINT ["/entrypoint.sh"]

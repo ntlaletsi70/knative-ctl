@@ -23,7 +23,7 @@ spec:
     spec:
       serviceAccountName: knative-ui
       containers:
-        - image: ttl.sh/knative-ui-REPLACE_SHA:24h
+        - image: ttl.sh/knative-ui-e6cae15b3d11747497f4498ef58b4453c04e2baf:24h
           ports:
             - containerPort: 8090
           resources:

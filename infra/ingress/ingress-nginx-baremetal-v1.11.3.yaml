@@ -432,6 +432,7 @@ spec:
         - --validating-webhook-key=/usr/local/certificates/key
         - --enable-metrics=false
         - --default-backend-service=kourier-system/kourier-internal
+        - --default-ssl-certificate=ingress-nginx/ingress-nginx-default-tls
         env:
         - name: POD_NAME
           valueFrom:

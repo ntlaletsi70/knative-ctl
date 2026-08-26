@@ -1,0 +1,25 @@
+# Self-signed TLS for the nginx-ingress front door. Deliberately not a
+# shared internal CA -- each Certificate cert-manager issues here is
+# independently self-signed, simplest option for a dev PoC with no public
+# DNS. Clients need -k/--insecure (curl) or equivalent, there's no root
+# to trust.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress-nginx-default-tls
+  namespace: ingress-nginx
+spec:
+  secretName: ingress-nginx-default-tls
+  issuerRef:
+    name: selfsigned-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.knative-demo.svc.cluster.local"
+    - "*.svc.cluster.local"

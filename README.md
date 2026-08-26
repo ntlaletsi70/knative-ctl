@@ -152,9 +152,10 @@ MetalLB rather than the node's own address:
 Kourier is the only thing doing actual Knative routing (host matching,
 traffic splitting) in either direction — `nginx-ingress` is purely a
 front door bolted onto its north-south side, not a second routing
-plane. `cert-manager` is also installed for a later self-signed
-`ClusterIssuer`, but TLS termination on the front door is deliberately
-not wired up yet.
+plane. `cert-manager` issues a self-signed default TLS cert for the
+front door (`--default-ssl-certificate`, one cert for any HTTPS
+connection since there's no per-host `Ingress`/SNI config yet) — no
+shared root, so clients need `-k`/`--insecure` or equivalent.
 
 Manifests and the cluster-level setup steps for this are in
 [`infra/ingress/`](infra/ingress/).

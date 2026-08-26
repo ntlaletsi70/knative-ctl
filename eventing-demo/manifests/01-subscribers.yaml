@@ -1,0 +1,58 @@
+# Two subscriber Knative Services, same echo-logger image -- what each
+# one actually receives is decided by its Trigger's filter (02-triggers.yaml),
+# not by anything different in the image itself. min-scale:0 since
+# these only need to exist when an event actually arrives; CPU is tight
+# on this node so both carry deliberately small requests.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: push-handler
+  namespace: knative-demo
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+        autoscaling.knative.dev/max-scale: "2"
+    spec:
+      containers:
+        - image: REPLACE_ECHO_LOGGER_IMAGE
+          env:
+            - name: SUBSCRIBER_NAME
+              value: push-handler
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 30m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: pr-handler
+  namespace: knative-demo
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "0"
+        autoscaling.knative.dev/max-scale: "2"
+    spec:
+      containers:
+        - image: REPLACE_ECHO_LOGGER_IMAGE
+          env:
+            - name: SUBSCRIBER_NAME
+              value: pr-handler
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 30m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

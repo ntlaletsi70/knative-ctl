@@ -1,0 +1,53 @@
+# Filtering happens here, not in the subscribers -- this is the actual
+# point of Broker/Trigger: one event stream, multiple independent
+# subscribers each declaring what they care about.
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: push-trigger
+  namespace: knative-demo
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: dev.github.push
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: push-handler
+---
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: pull-request-trigger
+  namespace: knative-demo
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: dev.github.pull_request
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: pr-handler
+---
+# GitHub sends this once, immediately, when a webhook is first
+# registered -- route it too so the initial setup test is visibly
+# handled, not silently dropped for not matching push/pull_request.
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: ping-trigger
+  namespace: knative-demo
+spec:
+  broker: default
+  filter:
+    attributes:
+      type: dev.github.ping
+  subscriber:
+    ref:
+      apiVersion: serving.knative.dev/v1
+      kind: Service
+      name: push-handler

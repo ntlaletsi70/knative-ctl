@@ -1,0 +1,30 @@
+# min-scale: 1 -- unlike the demo app, this needs to be reliably up to
+# receive GitHub's webhook whenever it fires, not cold-start on the
+# first delivery attempt (GitHub retries on failure, but no reason to
+# rely on that).
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: github-receiver
+  namespace: knative-demo
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/min-scale: "1"
+        autoscaling.knative.dev/max-scale: "1"
+    spec:
+      containers:
+        - image: REPLACE_RECEIVER_IMAGE
+          env:
+            - name: BROKER_URL
+              value: http://broker-ingress.knative-eventing.svc.cluster.local/knative-demo/default
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              cpu: 30m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

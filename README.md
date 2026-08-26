@@ -55,6 +55,7 @@ main.go, release.go   knative-ctl CLI source
 examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
+infra/ingress/          nginx-ingress + MetalLB + cert-manager manifests, see below
 .github/workflows/     build-app.yml (build+push), deploy.yml (release flows),
                        test-deploy-flows.yml (e2e test of the release flows)
 ```
@@ -155,10 +156,8 @@ plane. `cert-manager` is also installed for a later self-signed
 `ClusterIssuer`, but TLS termination on the front door is deliberately
 not wired up yet.
 
-The manifests for this (`ingress-nginx`, `metallb`, `metallb-pool`,
-`cert-manager`) are currently applied straight from upstream releases
-rather than checked into `examples/` — ask before assuming they're
-part of a fresh clone of this repo.
+Manifests and the cluster-level setup steps for this are in
+[`infra/ingress/`](infra/ingress/).
 
 ## Example manifests
 

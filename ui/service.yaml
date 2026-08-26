@@ -1,0 +1,43 @@
+# Deploys the dashboard as a Knative Service itself, reachable through
+# the same north-south path as the demo app (infra/ingress/). Image tag
+# gets updated by .github/workflows/build-ui.yml / a manual build --
+# see ui/README.md.
+#
+# min-scale/max-scale pinned to 1: an ops dashboard cold-starting on
+# first request (and losing its live pod-watch connection every time it
+# scales to zero) is bad UX, unlike the demo app where scale-to-zero is
+# the whole point.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: knative-ui
+  namespace: knative-demo
+spec:
+  template:
+    metadata:
+      name: knative-ui-v1
+      annotations:
+        autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev"
+        autoscaling.knative.dev/min-scale: "1"
+        autoscaling.knative.dev/max-scale: "1"
+    spec:
+      serviceAccountName: knative-ui
+      containers:
+        - image: ttl.sh/knative-ui-REPLACE_SHA:24h
+          ports:
+            - containerPort: 8090
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL

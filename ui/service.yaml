@@ -15,7 +15,13 @@ metadata:
 spec:
   template:
     metadata:
-      name: knative-ui-v1
+      # No pinned revision name: unlike examples/normal/service.yaml
+      # (a single never-updated demo deploy), this manifest gets
+      # re-applied with new image tags as the dashboard changes -- a
+      # pinned name would make Knative's webhook reject that as an
+      # illegal mutation of an immutable revision (the exact bug
+      # release.go's deployNewRevision works around for knative-ctl's
+      # own release flows). Auto-generated names sidestep it entirely.
       annotations:
         autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev"
         autoscaling.knative.dev/min-scale: "1"
@@ -23,7 +29,7 @@ spec:
     spec:
       serviceAccountName: knative-ui
       containers:
-        - image: ttl.sh/knative-ui-e6cae15b3d11747497f4498ef58b4453c04e2baf:24h
+        - image: ttl.sh/knative-ui-2e9dea0f77ac5af1401874e1d2ca9dd32533c48a:24h
           ports:
             - containerPort: 8090
           resources:

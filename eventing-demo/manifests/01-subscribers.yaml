@@ -16,7 +16,7 @@ spec:
         autoscaling.knative.dev/max-scale: "2"
     spec:
       containers:
-        - image: REPLACE_ECHO_LOGGER_IMAGE
+        - image: ttl.sh/eventing-demo-echo-logger-85fe58a79cb448935f91abe75d3c74dd97640ade:24h
           env:
             - name: SUBSCRIBER_NAME
               value: push-handler
@@ -43,7 +43,7 @@ spec:
         autoscaling.knative.dev/max-scale: "2"
     spec:
       containers:
-        - image: REPLACE_ECHO_LOGGER_IMAGE
+        - image: ttl.sh/eventing-demo-echo-logger-85fe58a79cb448935f91abe75d3c74dd97640ade:24h
           env:
             - name: SUBSCRIBER_NAME
               value: pr-handler

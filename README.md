@@ -51,7 +51,7 @@ demos and manifests linked throughout.
 Layout:
 
 ```
-main.go, release.go   knative-ctl CLI source
+main.go, release.go, frontdoor.go   knative-ctl CLI source
 examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
@@ -119,10 +119,20 @@ briefly time out under load).
 
 ## Front door: nginx-ingress + MetalLB + Kourier
 
-Verified working end-to-end. Kourier's own external
-`LoadBalancer` is reverted to `ClusterIP`-only; `nginx-ingress` is the
-single external entry point instead, reached via a real LAN IP from
-MetalLB rather than the node's own address:
+Verified working end-to-end. Installed the same way as `knative`/
+`kourier` above:
+
+```
+knative-ctl install kourier
+knative-ctl install metallb
+knative-ctl install cert-manager
+knative-ctl install ingress
+```
+
+Kourier's own external `LoadBalancer` is reverted to `ClusterIP`-only
+by the `ingress` target; `nginx-ingress` is the single external entry
+point instead, reached via a real LAN IP from MetalLB rather than the
+node's own address:
 
 ```
         client (LAN)

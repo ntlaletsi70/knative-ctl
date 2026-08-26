@@ -91,6 +91,11 @@ Platform lifecycle:
   knative-ctl install   knative|kourier|all [--version knative-vX.Y.Z]
   knative-ctl uninstall knative|kourier|all [--version knative-vX.Y.Z]
 
+Front door (infra/ingress/ -- metallb and cert-manager stand alone, ingress
+needs kourier already installed, --version does not apply to any of these):
+  knative-ctl install   metallb|cert-manager|ingress
+  knative-ctl uninstall metallb|cert-manager|ingress
+
 Release flows (operate on a knative Service already deployed):
   knative-ctl canary    <service> <image> [--steps 10,50,100] [--interval 20s] [--namespace default]
   knative-ctl bluegreen <service> <image> [--namespace default]
@@ -105,13 +110,19 @@ func install(target, version string) error {
 		return installKnative(version)
 	case "kourier":
 		return installKourier(version)
+	case "metallb":
+		return installMetalLB()
+	case "cert-manager":
+		return installCertManager()
+	case "ingress":
+		return installIngress()
 	case "all":
 		if err := installKnative(version); err != nil {
 			return err
 		}
 		return installKourier(version)
 	default:
-		return fmt.Errorf("unknown install target %q (want knative|kourier|all)", target)
+		return fmt.Errorf("unknown install target %q (want knative|kourier|metallb|cert-manager|ingress|all)", target)
 	}
 }
 
@@ -121,6 +132,12 @@ func uninstall(target, version string) error {
 		return uninstallKnative(version)
 	case "kourier":
 		return uninstallKourier(version)
+	case "metallb":
+		return uninstallMetalLB()
+	case "cert-manager":
+		return uninstallCertManager()
+	case "ingress":
+		return uninstallIngress()
 	case "all":
 		// Kourier depends on knative's CRDs/webhook, so remove it first.
 		if err := uninstallKourier(version); err != nil {
@@ -128,7 +145,7 @@ func uninstall(target, version string) error {
 		}
 		return uninstallKnative(version)
 	default:
-		return fmt.Errorf("unknown uninstall target %q (want knative|kourier|all)", target)
+		return fmt.Errorf("unknown uninstall target %q (want knative|kourier|metallb|cert-manager|ingress|all)", target)
 	}
 }
 

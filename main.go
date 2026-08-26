@@ -262,6 +262,21 @@ func installKourier(version string) error {
 		return fmt.Errorf("setting kourier as the ingress class: %w", err)
 	}
 
+	// applyWithRetry above just re-applied upstream kourier.yaml, which
+	// declares kourier as type: LoadBalancer -- if nginx-ingress is
+	// already installed (north-south), that's drift: it silently undoes
+	// kourier-clusterip.yaml's override via kubectl apply's 3-way merge,
+	// the exact problem that manifest exists to fix. Self-heal it
+	// whenever nginx-ingress is present, regardless of which install
+	// target got us here; leave kourier on its upstream LoadBalancer
+	// default otherwise, for anyone using kourier standalone.
+	if _, err := kubectlOutput("get", "deployment", "ingress-nginx-controller", "-n", "ingress-nginx"); err == nil {
+		if err := applyWithRetry(kourierClusterIP()); err != nil {
+			return err
+		}
+		fmt.Println("nginx-ingress detected, re-applied kourier-clusterip.yaml to keep kourier's Service on ClusterIP")
+	}
+
 	fmt.Println("kourier installed and set as the default ingress class")
 	return nil
 }

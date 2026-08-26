@@ -1,2 +1,4 @@
 /knative-ctl
 /knative-ui
+demo/3-dashboard/frames/
+demo/3-dashboard/__pycache__/

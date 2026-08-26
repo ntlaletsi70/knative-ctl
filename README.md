@@ -67,9 +67,11 @@ knative-demo`).
 
 ## Demos
 
-Both are two-pane recordings: `k9s` watching `knative-demo` (top) beside
-a scripted `bash` run driving the actual commands (bottom). Recorded with
-`asciinema` + `agg` inside a `screen` split.
+Demos 1 and 2 are two-pane terminal recordings: `k9s` watching
+`knative-demo` (top) beside a scripted `bash` run driving the actual
+commands (bottom), via `asciinema` + `agg` inside a `screen` split.
+Demo 3 is the dashboard (a browser page, not a terminal) — see
+`demo/3-dashboard/README.md` for how that one's actually captured.
 
 ### Demo 1: traffic spike and autoscaling
 
@@ -96,6 +98,16 @@ against the demo service. Re-run it yourself with:
 asciinema rec demo/2-canary-bluegreen/demo.cast -c "screen -c demo/2-canary-bluegreen/screenrc"
 agg demo/2-canary-bluegreen/demo.cast demo/2-canary-bluegreen/demo.gif
 ```
+
+### Demo 3: dashboard
+
+![dashboard demo](demo/3-dashboard/demo.gif)
+
+A canary release triggered from the [dashboard](ui/) UI, then a
+traffic-spike simulation watched live in the Pods panel — a real 0→2
+pod scale-out. See `demo/3-dashboard/README.md` for how this one's
+captured (no terminal to record — a hand-rolled Chrome DevTools
+Protocol driver instead).
 
 ## Build
 

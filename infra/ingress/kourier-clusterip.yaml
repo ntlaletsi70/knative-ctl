@@ -1,7 +1,7 @@
 # Declarative override of Kourier's own `kourier` Service. Upstream
 # kourier.yaml (what `knative-ctl install kourier` applies) declares
 # this as type: LoadBalancer -- fine on its own, but it fights
-# nginx-ingress for the node's host ports 80/443 in the front-door
+# nginx-ingress for the node's host ports 80/443 in the north-south
 # pattern (../README.md), where nginx-ingress is meant to be the only
 # external LoadBalancer. This file is the exact same Service, faithfully
 # copied from the live object (selector, ports), with only `type`

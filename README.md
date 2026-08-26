@@ -51,7 +51,7 @@ demos and manifests linked throughout.
 Layout:
 
 ```
-main.go, release.go, frontdoor.go   knative-ctl CLI source
+main.go, release.go, northsouth.go   knative-ctl CLI source
 examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
@@ -107,7 +107,7 @@ go build -o knative-ctl .
 
 Installs/uninstalls against the cluster the current kubeconfig points at,
 by applying the upstream release manifests (defaults to `knative-v1.23.0`).
-`all` covers everything below, including the front door
+`all` covers everything below, including north-south
 (`knative`, `kourier`, `metallb`, `cert-manager`, `ingress`), in
 dependency order:
 
@@ -117,12 +117,12 @@ knative-ctl uninstall knative|kourier|metallb|cert-manager|ingress|all [--versio
 ```
 
 `--version` only applies to `knative`/`kourier` — the other three are
-pinned to specific releases in `frontdoor.go`, not user-selectable.
+pinned to specific releases in `northsouth.go`, not user-selectable.
 `install kourier` also configures Kourier as the default Knative ingress
 class. Applies are retried once on transient failure (CRD establishment can
 briefly time out under load).
 
-## Front door: nginx-ingress + MetalLB + Kourier
+## North-south: nginx-ingress + MetalLB + Kourier
 
 Verified working end-to-end. `knative-ctl install all` includes this
 now, or install pieces individually the same way as `knative`/`kourier`
@@ -150,11 +150,11 @@ node's own address:
    └───────────┬────────────┘
                ▼
    ┌───────────────────────┐
-   │  ingress-nginx          │  north-south front door (LoadBalancer :80/:443)
-   │  --default-backend-     │  passthrough, Host header preserved,
-   │   service=kourier-      │  no per-service Ingress objects
-   │   system/kourier-internal│
+   │  ingress-nginx          │  north-south entry point (LoadBalancer :80/:443)
    └───────────┬────────────┘
+               │ Ingress in kourier-system, host *.knative-demo.svc.
+               │ cluster.local (same hosts the TLS cert authenticates
+               │ for) -- routes straight to kourier-internal
                ▼
    ┌───────────────────────┐
    │  kourier-internal        │  ClusterIP — also the direct entry point
@@ -167,12 +167,17 @@ node's own address:
 ```
 
 Kourier is the only thing doing actual Knative routing (host matching,
-traffic splitting) in either direction — `nginx-ingress` is purely a
-front door bolted onto its north-south side, not a second routing
-plane. `cert-manager` issues a self-signed default TLS cert for the
-front door (`--default-ssl-certificate`, one cert for any HTTPS
-connection since there's no per-host `Ingress`/SNI config yet) — no
-shared root, so clients need `-k`/`--insecure` or equivalent.
+traffic splitting) in either direction — `nginx-ingress` is purely the
+north-south entry point, not a second routing plane: one `Ingress`
+object declares the route to Kourier for the hosts actually being
+served, Kourier does everything past that. The controller's own
+`--default-backend-service=kourier-system/kourier-internal` flag stays
+too, as a fallback for anything that somehow doesn't match the
+Ingress's host — the Ingress is the primary, declared route.
+`cert-manager` issues a self-signed default TLS cert
+(`--default-ssl-certificate`, one cert for any HTTPS connection since
+there's no per-host SNI config yet) — no shared root, so clients need
+`-k`/`--insecure` or equivalent.
 
 Manifests and the cluster-level setup steps for this are in
 [`infra/ingress/`](infra/ingress/).

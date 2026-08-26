@@ -1,4 +1,4 @@
-# Self-signed TLS for the nginx-ingress front door. Deliberately not a
+# Self-signed TLS for the nginx-ingress north-south entry point. Deliberately not a
 # shared internal CA -- each Certificate cert-manager issues here is
 # independently self-signed, simplest option for a dev PoC with no public
 # DNS. Clients need -k/--insecure (curl) or equivalent, there's no root

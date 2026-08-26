@@ -1,0 +1,36 @@
+# The actual declared north-south route to Kourier's ClusterIP Service.
+# Lives in kourier-system, not ingress-nginx, because an Ingress's
+# backend Service must be in the same namespace as the Ingress object
+# itself, and kourier-internal lives in kourier-system.
+#
+# The host here matches tls-selfsigned.yaml's Certificate dnsNames
+# (*.knative-demo.svc.cluster.local) on purpose -- same hosts the front
+# door is authenticating TLS for are the ones this Ingress declares it
+# routes, rather than a blind catch-all with no relationship to what's
+# actually being served. nginx wildcard hosts only substitute one label
+# (*.foo.com matches bar.foo.com, not bar.baz.foo.com), so this only
+# covers knative-demo -- add another host entry per namespace if the
+# demo ever spans more than one.
+#
+# --default-backend-service=kourier-system/kourier-internal (the
+# controller arg in ingress-nginx-baremetal-v1.11.3.yaml) stays too, as
+# a fallback for anything that doesn't match this host -- this Ingress
+# is the primary, declared route.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kourier-northsouth
+  namespace: kourier-system
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: "*.knative-demo.svc.cluster.local"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier-internal
+                port:
+                  number: 80

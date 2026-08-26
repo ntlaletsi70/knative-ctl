@@ -1,9 +1,9 @@
-# Front door: nginx-ingress + MetalLB + Kourier
+# North-south: nginx-ingress + MetalLB + Kourier
 
-Manifests for the pattern documented in the top-level README's "Front
-door" section. Installed through `knative-ctl` itself, same pattern as
-`knative`/`kourier` (apply with retry, wait for rollout) — see
-`../../frontdoor.go`. Order matters:
+Manifests for the pattern documented in the top-level README's
+"North-south" section. Installed through `knative-ctl` itself, same
+pattern as `knative`/`kourier` (apply with retry, wait for rollout) —
+see `../../northsouth.go`. Order matters:
 
 ```
 knative-ctl install all
@@ -24,7 +24,7 @@ relative to each other, but both before `ingress` — its manifest
 references cert-manager's TLS secret, and it needs Kourier's Service to
 exist before overriding it. `--version` doesn't apply to these three;
 `metallb`/`cert-manager` are pinned upstream release versions inside
-`frontdoor.go` (`metallbVersion`/`certManagerVersion` constants, not a
+`northsouth.go` (`metallbVersion`/`certManagerVersion` constants, not a
 `--version` flag), and `ingress` doesn't have an upstream version at
 all since it's a hand-edited file, not a raw fetch.
 
@@ -63,6 +63,17 @@ silently got reverted the moment `kourier.yaml` was ever re-applied
 (kubectl apply's 3-way merge restores whatever the last manifest it
 saw said) — now it's a real, re-appliable manifest instead of tribal
 knowledge.
+
+`kourier-northsouth-ingress.yaml` is the actual declared north-south
+route: an `Ingress` object in `kourier-system`, host
+`*.knative-demo.svc.cluster.local` (the same hosts
+`tls-selfsigned.yaml`'s Certificate authenticates for), routing to
+`kourier-internal`. Lives in `kourier-system` rather than
+`ingress-nginx` because an `Ingress`'s backend `Service` must be in the
+same namespace as the `Ingress` itself. This is what makes north-south
+traffic reach Kourier, declaratively, rather than only through the
+controller's own `--default-backend-service` flag (which stays too, as
+a fallback for anything that doesn't match this host).
 
 ## Cluster-level step not captured in any manifest here
 

@@ -1,4 +1,4 @@
-// Install/uninstall for the front-door stack: MetalLB, cert-manager, and
+// Install/uninstall for the north-south stack: MetalLB, cert-manager, and
 // nginx-ingress. Same pattern as installKnative/installKourier in main.go
 // -- apply with retry, wait for rollout. Unmodified upstream releases
 // (metallb, cert-manager) are fetched straight from their download URL,
@@ -7,7 +7,7 @@
 // original content lives under infra/ingress/: ingress-nginx (hand-edited,
 // see infra/ingress/README.md for what changed and why), and the
 // resources this repo authored itself (kourier-clusterip, tls-selfsigned,
-// metallb-pool).
+// metallb-pool, kourier-northsouth-ingress).
 package main
 
 import "fmt"
@@ -46,6 +46,10 @@ func ingressNginxCore() manifest {
 
 func kourierClusterIP() manifest {
 	return manifest{name: "kourier ClusterIP override", url: infraDir + "/kourier-clusterip.yaml"}
+}
+
+func kourierNorthSouthIngress() manifest {
+	return manifest{name: "north-south Ingress -> kourier-internal", url: infraDir + "/kourier-northsouth-ingress.yaml"}
 }
 
 func installMetalLB() error {
@@ -132,11 +136,17 @@ func installIngress() error {
 	if err := applyWithRetry(kourierClusterIP()); err != nil {
 		return err
 	}
-	fmt.Println("ingress-nginx installed as the front door, kourier reverted to ClusterIP")
+	if err := applyWithRetry(kourierNorthSouthIngress()); err != nil {
+		return err
+	}
+	fmt.Println("ingress-nginx installed for north-south, kourier reverted to ClusterIP, north-south Ingress applied")
 	return nil
 }
 
 func uninstallIngress() error {
+	if err := deleteManifest(kourierNorthSouthIngress()); err != nil {
+		return err
+	}
 	if err := deleteManifest(ingressNginxCore()); err != nil {
 		return err
 	}

@@ -38,6 +38,6 @@ either.
 ## Scope
 
 Runs locally against whatever cluster your kubeconfig points at, for
-now — not deployed into the cluster or exposed behind the
-`infra/ingress/` front door. That's a reasonable next step once this is
-proven out, but wasn't the starting scope.
+now — not deployed into the cluster or exposed via `infra/ingress/`'s
+north-south path. That's a reasonable next step once this is proven
+out, but wasn't the starting scope.

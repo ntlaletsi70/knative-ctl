@@ -2,8 +2,8 @@
 
 A substitute for a cloud external LB/NLB when there's no cloud budget —
 `tailscaled` joins this node to an existing tailnet, and `tailscale
-serve` proxies a standard HTTPS endpoint to the front door's local
-NodePort. Verified end-to-end from a phone on a separate network (not
+serve` proxies a standard HTTPS endpoint to the north-south entry
+point's local NodePort. Verified end-to-end from a phone on a separate network (not
 this LAN), confirming genuine north-south reachability before it hits
 the same passthrough → Kourier → Revision path documented in the
 top-level README.

@@ -70,7 +70,12 @@ func loadtestStreamHandler(w http.ResponseWriter, r *http.Request) {
 	var total, errs int64
 	var firstErr string
 	var firstErrOnce sync.Once
-	client := &http.Client{Timeout: 5 * time.Second}
+	// No per-request timeout -- a cold start on this demo app can take
+	// ~20s (JVM boot), well past any reasonable-sounding fixed value; the
+	// overall test `duration` above already bounds every in-flight
+	// request via ctx cancellation, same as demo/1-traffic-spike's curl
+	// workers have no timeout of their own either.
+	client := &http.Client{}
 
 	for i := 0; i < workers; i++ {
 		go func() {

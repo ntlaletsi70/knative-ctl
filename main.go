@@ -87,14 +87,14 @@ func runLifecycle(action string, args []string) error {
 func usage() {
 	fmt.Println(`knative-ctl - Knative Serving + Kourier lifecycle and release automation
 
-Platform lifecycle:
-  knative-ctl install   knative|kourier|all [--version knative-vX.Y.Z]
-  knative-ctl uninstall knative|kourier|all [--version knative-vX.Y.Z]
+Platform lifecycle. "all" installs/uninstalls everything below in
+dependency order (knative, kourier, metallb, cert-manager, ingress) --
+--version only applies to knative/kourier, the rest are pinned versions:
+  knative-ctl install   knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
+  knative-ctl uninstall knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
 
-Front door (infra/ingress/ -- metallb and cert-manager stand alone, ingress
-needs kourier already installed, --version does not apply to any of these):
-  knative-ctl install   metallb|cert-manager|ingress
-  knative-ctl uninstall metallb|cert-manager|ingress
+ingress makes nginx-ingress the single external LoadBalancer in front of
+Kourier (infra/ingress/README.md) -- needs kourier installed first.
 
 Release flows (operate on a knative Service already deployed):
   knative-ctl canary    <service> <image> [--steps 10,50,100] [--interval 20s] [--namespace default]
@@ -117,10 +117,23 @@ func install(target, version string) error {
 	case "ingress":
 		return installIngress()
 	case "all":
-		if err := installKnative(version); err != nil {
-			return err
+		// Dependency order: knative before kourier (kourier needs its
+		// CRDs/webhook), kourier before ingress (ingress reverts its
+		// Service), metallb/cert-manager before ingress (its manifest
+		// references MetalLB's LoadBalancer type and cert-manager's TLS
+		// secret). metallb and cert-manager don't depend on each other.
+		for _, step := range []func() error{
+			func() error { return installKnative(version) },
+			func() error { return installKourier(version) },
+			installMetalLB,
+			installCertManager,
+			installIngress,
+		} {
+			if err := step(); err != nil {
+				return err
+			}
 		}
-		return installKourier(version)
+		return nil
 	default:
 		return fmt.Errorf("unknown install target %q (want knative|kourier|metallb|cert-manager|ingress|all)", target)
 	}
@@ -139,11 +152,19 @@ func uninstall(target, version string) error {
 	case "ingress":
 		return uninstallIngress()
 	case "all":
-		// Kourier depends on knative's CRDs/webhook, so remove it first.
-		if err := uninstallKourier(version); err != nil {
-			return err
+		// Reverse of install's order.
+		for _, step := range []func() error{
+			uninstallIngress,
+			uninstallCertManager,
+			uninstallMetalLB,
+			func() error { return uninstallKourier(version) },
+			func() error { return uninstallKnative(version) },
+		} {
+			if err := step(); err != nil {
+				return err
+			}
 		}
-		return uninstallKnative(version)
+		return nil
 	default:
 		return fmt.Errorf("unknown uninstall target %q (want knative|kourier|metallb|cert-manager|ingress|all)", target)
 	}

@@ -107,20 +107,26 @@ go build -o knative-ctl .
 
 Installs/uninstalls against the cluster the current kubeconfig points at,
 by applying the upstream release manifests (defaults to `knative-v1.23.0`).
+`all` covers everything below, including the front door
+(`knative`, `kourier`, `metallb`, `cert-manager`, `ingress`), in
+dependency order:
 
 ```
-knative-ctl install   knative|kourier|all [--version knative-vX.Y.Z]
-knative-ctl uninstall knative|kourier|all [--version knative-vX.Y.Z]
+knative-ctl install   knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
+knative-ctl uninstall knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
 ```
 
+`--version` only applies to `knative`/`kourier` — the other three are
+pinned to specific releases in `frontdoor.go`, not user-selectable.
 `install kourier` also configures Kourier as the default Knative ingress
 class. Applies are retried once on transient failure (CRD establishment can
 briefly time out under load).
 
 ## Front door: nginx-ingress + MetalLB + Kourier
 
-Verified working end-to-end. Installed the same way as `knative`/
-`kourier` above:
+Verified working end-to-end. `knative-ctl install all` includes this
+now, or install pieces individually the same way as `knative`/`kourier`
+above:
 
 ```
 knative-ctl install kourier

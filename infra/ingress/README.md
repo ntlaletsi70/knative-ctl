@@ -6,6 +6,13 @@ door" section. Installed through `knative-ctl` itself, same pattern as
 `../../frontdoor.go`. Order matters:
 
 ```
+knative-ctl install all
+```
+
+runs the whole thing (knative, kourier, metallb, cert-manager, ingress)
+in dependency order — or install pieces individually:
+
+```
 knative-ctl install kourier         # if not already installed
 knative-ctl install metallb
 knative-ctl install cert-manager
@@ -15,13 +22,16 @@ knative-ctl install ingress         # needs kourier; reverts its Service to Clus
 `metallb` and `cert-manager` stand alone and can run in either order
 relative to each other, but both before `ingress` — its manifest
 references cert-manager's TLS secret, and it needs Kourier's Service to
-exist before overriding it. `--version` doesn't apply to any of these
-three; they're pinned to the specific vendored files below, not a
-version-parameterized upstream URL like `knative`/`kourier` use.
+exist before overriding it. `--version` doesn't apply to these three;
+`metallb`/`cert-manager` are pinned upstream release versions inside
+`frontdoor.go` (`metallbVersion`/`certManagerVersion` constants, not a
+`--version` flag), and `ingress` doesn't have an upstream version at
+all since it's a hand-edited file, not a raw fetch.
 
-The manifests themselves, for reference (`knative-ctl install` is the
-supported way to apply them — direct `kubectl apply -f` still works
-identically, it's the same files):
+`metallb` and `cert-manager` are fetched straight from their upstream
+release URLs, same as `knative`/`kourier` — no local copy checked in,
+since neither is modified from stock. Only genuinely customized or
+original content lives in this directory:
 
 `ingress-nginx-baremetal-v1.11.3.yaml` is hand-edited from the stock
 upstream release, not a raw download — three changes from the original:

@@ -1,20 +1,28 @@
-// Install/uninstall for the front-door stack (infra/ingress/): MetalLB,
-// cert-manager, and nginx-ingress. Same pattern as installKnative/
-// installKourier in main.go -- apply with retry, wait for rollout -- just
-// pointed at the manifests checked into infra/ingress/ instead of a
-// version-parameterized upstream URL, since these are vendored/hand-edited
-// copies (see infra/ingress/README.md for what's edited and why).
-//
-// Not folded into `install all`, which already means "knative+kourier" --
-// these are separate, explicitly-requested targets.
+// Install/uninstall for the front-door stack: MetalLB, cert-manager, and
+// nginx-ingress. Same pattern as installKnative/installKourier in main.go
+// -- apply with retry, wait for rollout. Unmodified upstream releases
+// (metallb, cert-manager) are fetched straight from their download URL,
+// exactly like servingCore/kourier do -- no local vendored copy of
+// something that isn't actually customized. Only genuinely-edited or
+// original content lives under infra/ingress/: ingress-nginx (hand-edited,
+// see infra/ingress/README.md for what changed and why), and the
+// resources this repo authored itself (kourier-clusterip, tls-selfsigned,
+// metallb-pool).
 package main
 
 import "fmt"
 
-const infraDir = "infra/ingress"
+const (
+	metallbVersion     = "v0.16.0"
+	certManagerVersion = "v1.21.1"
+	infraDir           = "infra/ingress"
+)
 
 func metallbCore() manifest {
-	return manifest{name: "metallb", url: infraDir + "/metallb-native-v0.16.0.yaml"}
+	return manifest{
+		name: "metallb",
+		url:  fmt.Sprintf("https://raw.githubusercontent.com/metallb/metallb/%s/config/manifests/metallb-native.yaml", metallbVersion),
+	}
 }
 
 func metallbPool() manifest {
@@ -22,7 +30,10 @@ func metallbPool() manifest {
 }
 
 func certManagerCore() manifest {
-	return manifest{name: "cert-manager", url: infraDir + "/cert-manager-v1.21.1.yaml"}
+	return manifest{
+		name: "cert-manager",
+		url:  fmt.Sprintf("https://github.com/cert-manager/cert-manager/releases/download/%s/cert-manager.yaml", certManagerVersion),
+	}
 }
 
 func tlsSelfsigned() manifest {

@@ -1,0 +1,77 @@
+# Zipkin, as the single trace backend for Serving, Kourier and Eventing.
+#
+# Not the stock openzipkin/zipkin image: Knative dropped its native
+# Zipkin exporter (config-tracing's `backend: zipkin`) in favour of
+# OpenTelemetry, and as of knative-v1.23 every component -- activator,
+# queue-proxy, Kourier's Envoy, broker ingress/filter, IMC dispatcher --
+# only speaks OTLP. zipkin-otel is the same Zipkin server and UI with an
+# OTLP/HTTP collector added on the same port (POST :9411/v1/traces), so
+# this stays one pod instead of Zipkin + an OpenTelemetry Collector in
+# front of it translating OTLP -> Zipkin v2.
+#
+# In-memory storage: traces are gone on restart, and MEM_MAX_SPANS caps
+# how much heap they can take. Fine for a demo, not for anything you
+# need to look back at.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zipkin
+  namespace: observability
+  labels:
+    app: zipkin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zipkin
+  template:
+    metadata:
+      labels:
+        app: zipkin
+    spec:
+      containers:
+        - name: zipkin
+          image: ghcr.io/openzipkin-contrib/zipkin-otel:0.3.0
+          ports:
+            - name: http
+              containerPort: 9411
+          env:
+            - name: STORAGE_TYPE
+              value: mem
+            - name: MEM_MAX_SPANS
+              value: "50000"
+            - name: JAVA_OPTS
+              value: "-Xms128m -Xmx256m -XX:+ExitOnOutOfMemoryError"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zipkin
+  namespace: observability
+  labels:
+    app: zipkin
+spec:
+  selector:
+    app: zipkin
+  ports:
+    - name: http
+      port: 9411
+      targetPort: http

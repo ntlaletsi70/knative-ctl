@@ -3,28 +3,28 @@
 Manifests for the pattern documented in the top-level README's
 "North-south" section. Installed through `knative-ctl` itself, same
 pattern as `knative`/`kourier` (apply with retry, wait for rollout) —
-see `../../northsouth.go`. Order matters:
+see `../../main.go`. Order matters:
 
 ```
 knative-ctl install all
 ```
 
-runs the whole thing (knative, kourier, metallb, cert-manager, ingress)
-in dependency order — or install pieces individually:
+runs the whole thing (knative, kourier, metallb, cert-manager, ingress,
+then zipkin) in dependency order — or install pieces individually:
 
 ```
 knative-ctl install kourier         # if not already installed
 knative-ctl install metallb
 knative-ctl install cert-manager
-knative-ctl install ingress         # needs kourier; reverts its Service to ClusterIP
+knative-ctl install ingress         # needs kourier
 ```
 
 `metallb` and `cert-manager` stand alone and can run in either order
 relative to each other, but both before `ingress` — its manifest
-references cert-manager's TLS secret, and it needs Kourier's Service to
-exist before overriding it. `--version` doesn't apply to these three;
+references cert-manager's TLS secret, and its Ingress routes to
+Kourier's `kourier-internal` Service. `--version` doesn't apply to these three;
 `metallb`/`cert-manager` are pinned upstream release versions inside
-`northsouth.go` (`metallbVersion`/`certManagerVersion` constants, not a
+`main.go` (`metallbVersion`/`certManagerVersion` constants, not a
 `--version` flag), and `ingress` doesn't have an upstream version at
 all since it's a hand-edited file, not a raw fetch.
 
@@ -54,15 +54,18 @@ MetalLB `IPAddressPool` — specific to this LAN, adjust for a different
 network.
 
 `kourier-clusterip.yaml` overrides Kourier's own `kourier` Service
-(upstream default: `LoadBalancer`, which is what `knative-ctl install
-kourier` applies) to `ClusterIP`, so it stops competing with
-nginx-ingress for host ports 80/443. Apply it **after** installing/
-reinstalling Kourier, not before — order matters, see the comment in
-the file. This used to be a one-off `kubectl patch` run by hand, which
-silently got reverted the moment `kourier.yaml` was ever re-applied
-(kubectl apply's 3-way merge restores whatever the last manifest it
-saw said) — now it's a real, re-appliable manifest instead of tribal
-knowledge.
+(upstream default: `LoadBalancer`) to `ClusterIP`. Kourier is never
+exposed outside the cluster directly: east-west traffic goes to
+`kourier-internal`, and north-south traffic reaches that same Service
+through nginx-ingress. `knative-ctl install kourier` applies the
+override itself, straight after the upstream manifest and on every
+run — not just when nginx-ingress is present. Left as a `LoadBalancer`,
+Kourier claims the first MetalLB pool address before nginx-ingress
+exists (`install all` installs MetalLB first), and nginx-ingress ends
+up on the second one. It has to be re-applied each time because
+re-applying upstream `kourier.yaml` resets the type via kubectl apply's
+3-way merge, which is what silently undid the original one-off
+`kubectl patch`.
 
 `kourier-northsouth-ingress.yaml` is the actual declared north-south
 route: an `Ingress` object in `kourier-system`, host

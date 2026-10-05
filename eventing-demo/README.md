@@ -6,9 +6,11 @@ Knative `Broker`, and fanned out by `Trigger` filters to independent
 subscribers.
 
 ```
-GitHub ──HTTPS──▶ tailscale funnel ──▶ Kourier (external NodePort)
-                                              │ DomainMapping routes
-                                              │ this hostname to:
+GitHub ──HTTPS──▶ tailscale funnel ──▶ nginx-ingress (NodePort)
+                                              │ Ingress rewrites Host to
+                                              │ the cluster-local name
+                                              ▼
+                                      kourier-internal (ClusterIP)
                                               ▼
                                       github-receiver (Knative Service)
                                               │ wraps as CloudEvent,
@@ -43,39 +45,37 @@ content mode), forwards the original JSON body untouched.
 - `manifests/` — `Broker`, the two subscriber `Service`s, three
   `Trigger`s (push, pull_request, and ping — GitHub's own webhook-setup
   test event, routed so it's visibly handled rather than silently
-  dropped), and a `DomainMapping`.
+  dropped), and the webhook's public `Ingress`.
 
-## The DomainMapping gotcha
+## The public route
 
-Knative's auto-generated `*.svc.cluster.local` route is cluster-local
-only — Kourier's *external* Service 404s it (only `kourier-internal`
-serves cluster-local routes; a known gotcha from early in this whole
-PoC). `tailscale funnel` needs the *external* path, so
-`04-domainmapping.yaml` maps this node's Tailscale MagicDNS hostname
-directly to `github-receiver`, which gets it a real externally-routable
-route instead.
+Kourier is `ClusterIP`-only in this repo (see
+[`infra/ingress/`](../infra/ingress/)), and `kourier-internal` only
+knows a Knative Service by its cluster-local name
+(`github-receiver.knative-demo.svc.cluster.local`). GitHub, though,
+calls this node's Tailscale MagicDNS hostname.
 
-That also needed `autocreate-cluster-domain-claims: "true"` patched
-into `config-network` (defaults to `false` — meant for multi-tenant
-clusters where an admin manually delegates domains to namespaces;
-irrelevant on a single-tenant dev box) — without it, the
-`DomainMapping` sits at `DomainAlreadyClaimed`/`False` forever, since
-Knative expects a matching `ClusterDomainClaim` object to already
-exist and won't create one itself.
+`04-webhook-ingress.yaml` bridges the two on nginx-ingress: it matches
+the public hostname and rewrites the `Host` header to the cluster-local
+one (`nginx.ingress.kubernetes.io/upstream-vhost`), so the webhook
+takes the same nginx → `kourier-internal` path as all other
+north-south traffic. This replaced an earlier `DomainMapping`, which
+only works through Kourier's external listener — the thing that's no
+longer exposed — and needed `autocreate-cluster-domain-claims` patched
+into `config-network` besides.
 
 ## Setting it up
 
 ```
+knative-ctl install eventing                  # core + in-memory channel + mt channel broker
 kubectl apply -f manifests/00-broker.yaml
 kubectl apply -f manifests/01-subscribers.yaml
 kubectl apply -f manifests/02-triggers.yaml
 kubectl apply -f manifests/03-receiver.yaml   # update the image tags first, see below
-kubectl patch configmap config-network -n knative-serving --type merge \
-  -p '{"data":{"autocreate-cluster-domain-claims":"true"}}'
-kubectl apply -f manifests/04-domainmapping.yaml
+kubectl apply -f manifests/04-webhook-ingress.yaml   # set its host to your own MagicDNS name
 
-tailscale funnel --bg 31852   # 31852 is Kourier's external NodePort for :80 -- check yours:
-                               #   kubectl get svc kourier -n kourier-system
+tailscale funnel --bg 30412   # nginx-ingress's HTTP NodePort -- check yours:
+                               #   kubectl get svc ingress-nginx-controller -n ingress-nginx
 ```
 
 Images are built by `.github/workflows/build-eventing-demo.yml`
@@ -85,17 +85,27 @@ Images are built by `.github/workflows/build-eventing-demo.yml`
 
 ## Verified
 
-- Simulated `push`/`pull_request`/`ping` payloads via `curl`, both
-  through `kourier-internal` (cluster-local) and through Kourier's
-  external NodePort + the `DomainMapping` — correct fan-out each time,
-  confirmed via each subscriber's logs.
-- A real GitHub webhook configured on this repo
-  (`https://api.github.com/repos/ntlaletsi70/knative-ctl/hooks`),
-  pointed at the `tailscale funnel` URL. GitHub's automatic `ping`
-  delivery on webhook creation arrived for real, over the actual
-  public internet, and routed correctly to `push-handler` via
-  `ping-trigger`. A follow-up commit's real `push` delivery arrived
-  the same way, with the actual commit SHA/author/file list intact.
+On a fresh `kind` cluster, after `knative-ctl install all` and
+`knative-ctl install eventing`:
+
+- Simulated `push` and `pull_request` payloads sent with `curl` to
+  nginx-ingress with the public `Host` header (the path `tailscale
+  funnel` delivers to): `202` from the Broker, and the event logged by
+  the right subscriber — `push-handler` or `pr-handler` — scaled up from
+  zero to take it.
+- The whole hop sequence as **one** Zipkin trace, 39 spans: gateway →
+  activator → `github-receiver` → `broker.ingress` → in-memory channel
+  dispatcher → `broker.filter` (all three Triggers evaluated, one
+  matching) → gateway → activator → `push-handler`. The subscriber's
+  cold start is visible in it as a ~1.4s `throttler_try` span on the
+  activator. See [`infra/observability/`](../infra/observability/).
+
+Verified earlier, on the original k3s node and through the
+`DomainMapping` route this replaced: a real GitHub webhook over
+`tailscale funnel` — GitHub's automatic `ping` on webhook creation, and
+a follow-up commit's real `push` delivery with the actual commit
+SHA/author/file list intact. The `funnel` → nginx-ingress leg of the
+current route has not been re-run against real GitHub yet.
 
 ## Resource footprint on this hardware
 

@@ -1,23 +1,19 @@
 # Declarative override of Kourier's own `kourier` Service. Upstream
-# kourier.yaml (what `knative-ctl install kourier` applies) declares
-# this as type: LoadBalancer -- fine on its own, but it fights
-# nginx-ingress for the node's host ports 80/443 in the north-south
-# pattern (../README.md), where nginx-ingress is meant to be the only
-# external LoadBalancer. This file is the exact same Service, faithfully
-# copied from the live object (selector, ports), with only `type`
-# changed to ClusterIP.
+# kourier.yaml declares it as type: LoadBalancer; this repo never wants
+# Kourier exposed that way. On a cluster with MetalLB it would claim the
+# first pool address ahead of nginx-ingress, and there'd be two external
+# entry points instead of one. This file is the exact same Service
+# (selector, ports), with only `type` changed to ClusterIP.
 #
-# Apply this AFTER (re)installing Kourier, not before -- order matters:
+# Traffic reaches Kourier through ClusterIP only:
+#   east-west    pod -> kourier-internal.kourier-system.svc.cluster.local
+#   north-south  nginx-ingress -> Ingress (kourier-northsouth-ingress.yaml)
+#                -> kourier-internal
 #
-#   knative-ctl install kourier
-#   kubectl apply -f infra/ingress/kourier-clusterip.yaml
-#
-# Re-applying plain kourier.yaml afterward (a knative-ctl reinstall, a
-# version bump, CI, whatever) resets the type back to LoadBalancer via
-# kubectl apply's own 3-way merge, since its last-applied-configuration
-# still says LoadBalancer -- that's what silently undid a `kubectl
-# patch` version of this same change previously. Re-run the apply above
-# any time that happens; it's idempotent.
+# `knative-ctl install kourier` applies this right after upstream
+# kourier.yaml, every time. It has to be every time: re-applying upstream
+# resets the type back to LoadBalancer via kubectl apply's 3-way merge,
+# which is what silently undid a one-off `kubectl patch` of this before.
 apiVersion: v1
 kind: Service
 metadata:

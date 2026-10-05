@@ -51,12 +51,14 @@ demos and manifests linked throughout.
 Layout:
 
 ```
-main.go, release.go, northsouth.go   knative-ctl CLI source
+main.go, release.go    knative-ctl CLI source
 examples/              normal / canary / bluegreen manifests, run against them
 app/                    the Spring Boot demo service
 demo/                   recorded GIF demos embedded above, and the scripts that made them
 infra/ingress/          nginx-ingress + MetalLB + cert-manager manifests, see below
 infra/tailscale/        external access setup, no cloud NLB required
+infra/observability/    Zipkin + the tracing config for Serving, Kourier and Eventing
+eventing-demo/          GitHub webhook -> Broker/Trigger fan-out
 ui/                      dashboard: trigger releases, watch pods scale live -- local or in-cluster
 .github/workflows/     build-app.yml (build+push), deploy.yml (release flows),
                        test-deploy-flows.yml (e2e test of the release flows)
@@ -119,19 +121,20 @@ go build -o knative-ctl .
 
 Installs/uninstalls against the cluster the current kubeconfig points at,
 by applying the upstream release manifests (defaults to `knative-v1.23.0`).
-`all` covers everything below, including north-south
-(`knative`, `kourier`, `metallb`, `cert-manager`, `ingress`), in
-dependency order:
+`all` covers `knative`, `kourier`, `metallb`, `cert-manager`, `ingress`
+and `zipkin`, in dependency order. `eventing` is its own target and
+never part of `all` — it's the heaviest piece by far (see
+[`eventing-demo/`](eventing-demo/)):
 
 ```
-knative-ctl install   knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
-knative-ctl uninstall knative|kourier|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
+knative-ctl install   knative|kourier|eventing|zipkin|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
+knative-ctl uninstall knative|kourier|eventing|zipkin|metallb|cert-manager|ingress|all [--version knative-vX.Y.Z]
 ```
 
-`--version` only applies to `knative`/`kourier` — the other three are
-pinned to specific releases in `northsouth.go`, not user-selectable.
+`--version` only applies to `knative`/`kourier`/`eventing` — the rest
+are pinned to specific releases in `main.go`, not user-selectable.
 `install kourier` also configures Kourier as the default Knative ingress
-class. Applies are retried once on transient failure (CRD establishment can
+class and keeps its Service `ClusterIP`-only (see below). Applies are retried once on transient failure (CRD establishment can
 briefly time out under load).
 
 ## North-south: nginx-ingress + MetalLB + Kourier
@@ -147,10 +150,11 @@ knative-ctl install cert-manager
 knative-ctl install ingress
 ```
 
-Kourier's own external `LoadBalancer` is reverted to `ClusterIP`-only
-by the `ingress` target; `nginx-ingress` is the single external entry
-point instead, reached via a real LAN IP from MetalLB rather than the
-node's own address:
+Kourier is never an external `LoadBalancer`: `install kourier` switches
+its Service to `ClusterIP` straight after applying the upstream manifest.
+East-west traffic goes directly to `kourier-internal`, and `nginx-ingress`
+is the single external entry point in front of that same Service, reached
+via a real LAN IP from MetalLB rather than the node's own address:
 
 ```
         client (LAN)
@@ -218,6 +222,21 @@ curl -H "Host: knative-demo-app.knative-demo.svc.cluster.local" https://blanketo
 ```
 
 returned `200` with the real app response.
+
+## Tracing: Zipkin
+
+`knative-ctl install zipkin` (part of `install all`) deploys Zipkin and
+points Serving, Kourier's gateway and — if installed — Eventing at it,
+so every request and every event shows up as one trace across all the
+hops it took:
+
+```
+kubectl port-forward -n observability svc/zipkin 9411:9411   # http://localhost:9411
+knative-ctl trace-sampling 0.1                               # default is 1 (every request)
+```
+
+What's in a trace, how to watch traffic live, and why this isn't the
+stock Zipkin image are in [`infra/observability/`](infra/observability/).
 
 ## Example manifests
 

@@ -1,0 +1,33 @@
+# The public route for GitHub's webhook: this node's Tailscale MagicDNS
+# hostname, on nginx-ingress, straight to github-receiver.
+#
+# Kourier is ClusterIP-only (infra/ingress/kourier-clusterip.yaml), and
+# kourier-internal only knows a Knative Service by its cluster-local
+# name. So rather than teach Knative a second, external hostname (a
+# DomainMapping, which Kourier serves on its external listener only),
+# nginx rewrites the Host header to the cluster-local one on the way
+# through, and the request takes the same nginx -> kourier-internal
+# path as everything else.
+#
+# In kourier-system for the same reason as kourier-northsouth-ingress:
+# an Ingress's backend Service must be in its own namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: github-webhook
+  namespace: kourier-system
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-vhost: github-receiver.knative-demo.svc.cluster.local
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: blanketops.tailf8145.ts.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier-internal
+                port:
+                  number: 80

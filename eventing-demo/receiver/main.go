@@ -74,6 +74,15 @@ func handleWebhook(w http.ResponseWriter, r *http.Request, brokerURL, secret str
 	req.Header.Set("Ce-Source", "github-webhook-receiver")
 	req.Header.Set("Ce-Type", "dev.github."+event)
 	req.Header.Set("Content-Type", "application/json")
+	// Carry the W3C trace context queue-proxy handed us onto the Broker
+	// request. Without it the Broker starts a fresh trace, and Zipkin
+	// shows the webhook's arrival and its fan-out as two unrelated
+	// traces instead of one.
+	for _, h := range []string{"Traceparent", "Tracestate"} {
+		if v := r.Header.Get(h); v != "" {
+			req.Header.Set(h, v)
+		}
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

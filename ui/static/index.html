@@ -8,7 +8,7 @@
 <body>
   <header>
     <h1>knative-ctl</h1>
-    <span class="subtitle">release control + live pod scaling</span>
+    <span class="subtitle">release control + live pod scaling + live traffic</span>
   </header>
 
   <main>
@@ -82,6 +82,27 @@
       <p class="hint">Only reaches the service when this dashboard runs
         in-cluster (kourier-internal isn't reachable from outside). Watch
         the pods above scale out live.</p>
+    </section>
+
+    <section class="panel" id="traffic-panel">
+      <h2>Live traffic <span id="traffic-window"></span>
+        <a id="zipkin-link" href="/zipkin/" target="_blank" rel="noopener">open Zipkin</a></h2>
+      <p id="traffic-status" class="empty-state">connecting to Zipkin...</p>
+
+      <div id="traffic-revisions"></div>
+
+      <table id="traffic-table" hidden>
+        <thead>
+          <tr>
+            <th>time</th>
+            <th>request</th>
+            <th>path</th>
+            <th class="num">status</th>
+            <th class="num">duration</th>
+          </tr>
+        </thead>
+        <tbody id="traffic-rows"></tbody>
+      </table>
     </section>
   </main>
 

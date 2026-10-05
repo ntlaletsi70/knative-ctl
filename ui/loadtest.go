@@ -92,6 +92,13 @@ func loadtestStreamHandler(w http.ResponseWriter, r *http.Request) {
 				req.Host = host
 				resp, err := client.Do(req)
 				if err != nil {
+					// Whatever was in flight when the test's own
+					// time ran out fails with "context deadline
+					// exceeded". That's the test ending, not the
+					// service failing.
+					if ctx.Err() != nil {
+						return
+					}
 					atomic.AddInt64(&errs, 1)
 					firstErrOnce.Do(func() { firstErr = err.Error() })
 					continue

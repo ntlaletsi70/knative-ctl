@@ -170,3 +170,100 @@ button:not(:disabled):hover { filter: brightness(1.1); }
 .phase-Failed, .phase-Unknown { color: var(--red); }
 
 .empty-state { color: var(--muted); font-size: 0.85rem; }
+
+#traffic-panel {
+  grid-column: 1 / -1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}
+
+#traffic-window { text-transform: none; letter-spacing: normal; }
+
+#zipkin-link {
+  float: right;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.8rem;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+#traffic-revisions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.traffic-service {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.78rem;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.traffic-service-name { color: var(--accent); font-weight: 600; margin-bottom: 0.4rem; }
+
+.traffic-rev {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+.traffic-rev + .traffic-rev { margin-top: 0.3rem; }
+.traffic-rev-name { color: var(--text); flex: 0 1 200px; word-break: break-all; }
+.traffic-rev-stat { white-space: nowrap; }
+
+.traffic-bar {
+  flex: 1 1 80px;
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.traffic-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--green);
+  transition: width 0.6s ease;
+}
+
+#traffic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+#traffic-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: normal;
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+#traffic-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid var(--panel);
+  vertical-align: top;
+  word-break: break-word;
+}
+#traffic-table .num { text-align: right; white-space: nowrap; }
+.traffic-hops { color: var(--muted); }
+.traffic-error, .traffic-error td { color: var(--red); }
+
+.badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.badge-cold { color: var(--yellow); border-color: var(--yellow); }

@@ -1,0 +1,35 @@
+# The dashboard on this node's Tailscale MagicDNS hostname. `tailscale
+# serve` hands nginx-ingress a request whose Host is the tailnet name,
+# which Kourier has never heard of -- so, same as the webhook route
+# (eventing-demo/manifests/04-webhook-ingress.yaml), nginx rewrites it to
+# the Knative Service's cluster-local name and sends it to
+# kourier-internal like everything else.
+#
+# Tailnet-only on purpose (`tailscale serve`, never `funnel`): the
+# dashboard has no authentication.
+#
+# In kourier-system for the same reason as kourier-northsouth-ingress:
+# an Ingress's backend Service must be in its own namespace.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard-tailnet
+  namespace: kourier-system
+  annotations:
+    nginx.ingress.kubernetes.io/upstream-vhost: knative-ui.knative-demo.svc.cluster.local
+    # The dashboard's panels are long-lived Server-Sent Event streams.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: pop-os.tailf8145.ts.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kourier-internal
+                port:
+                  number: 80

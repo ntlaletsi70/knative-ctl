@@ -36,6 +36,34 @@ Check the current serve config and hostname with:
 tailscale serve status
 ```
 
+## The dashboard in a browser
+
+A browser can't set a `Host` header the way the `curl` below does, so
+the dashboard gets its own route: `dashboard-ingress.yaml` matches this
+node's tailnet hostname on nginx-ingress and rewrites it to the
+dashboard's cluster-local name. Set its `host` to your own MagicDNS
+name, then:
+
+```
+kubectl apply -f infra/tailscale/dashboard-ingress.yaml
+sudo tailscale serve --bg --https=8443 http://<nginx-ingress address>
+# https://<node>.<tailnet>.ts.net:8443
+```
+
+`<nginx-ingress address>` is `127.0.0.1:<HTTP NodePort>` on a node that
+runs Kubernetes directly. On `kind` the node is a container, so
+NodePorts aren't on the host's loopback — use the node container's IP
+instead:
+
+```
+docker inspect <cluster>-control-plane --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.port==80)].nodePort}'
+```
+
+Use `serve`, never `funnel`, for this: the dashboard has no
+authentication and can trigger releases. A separate port (`8443`) also
+keeps it clear of anything already published on `443`.
+
 ## Verified
 
 ```

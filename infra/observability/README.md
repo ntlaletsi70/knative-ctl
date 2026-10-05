@@ -48,7 +48,11 @@ Zipkin with an OpenTelemetry Collector in front of it translating.
 
 ## Watching traffic live
 
-In the UI (`http://localhost:9411` through the port-forward):
+The [dashboard](../../ui/) has a live traffic panel built on this —
+per-revision traffic share and the most recent requests — and serves
+Zipkin's UI itself under `/zipkin/`.
+
+In Zipkin's own UI (`http://localhost:9411` through the port-forward):
 
 - **Find a trace → Run Query** lists the most recent traces; narrow with
   `serviceName=` to one hop. Re-run it while a load test is going.
@@ -109,5 +113,7 @@ and its fan-out to subscribers show up as two unrelated traces.
   capped at `MEM_MAX_SPANS` (50000).
 - **No spans from inside the apps.** The demo app and `echo-logger`
   aren't instrumented, so each trace ends at that pod's `queue-proxy`.
-- **The UI isn't exposed through the Ingress** — it has no
-  authentication, so it's port-forward only.
+- **No authentication.** Zipkin has no Ingress of its own, but the
+  dashboard proxies its UI, so anything that can reach the dashboard
+  can read every trace. Same caveat as the dashboard itself
+  (`ui/README.md`).

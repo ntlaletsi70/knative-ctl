@@ -1,8 +1,8 @@
 # Dashboard
 
 A small local web UI on top of `knative-ctl`: trigger canary/bluegreen/
-rollback releases from a form, and watch pods scale up/down live as they
-happen. Doesn't reimplement release logic — it shells out to the
+rollback releases from a form, watch pods scale up/down live as they
+happen, and watch the traffic itself as Zipkin records it. Doesn't reimplement release logic — it shells out to the
 `knative-ctl` binary itself and streams its output, same as running it
 from a terminal.
 
@@ -13,7 +13,9 @@ go build -o knative-ui ./ui
 ```
 
 Flags: `--addr` (default `127.0.0.1:8090`, localhost-only), `--knative-ctl`
-(path to the binary, default `./knative-ctl`).
+(path to the binary, default `./knative-ctl`), `--zipkin` (Zipkin base
+URL, default the in-cluster Service — run locally, point it at a
+port-forward: `--zipkin http://localhost:9411`).
 
 ## How it works
 
@@ -29,6 +31,22 @@ Flags: `--addr` (default `127.0.0.1:8090`, localhost-only), `--knative-ctl`
   injection surface regardless of what a client sends) and streams
   combined stdout/stderr line by line, then an `event: done` with the
   exit status.
+
+- `GET /api/traffic/stream` — SSE, every two seconds asks Zipkin for
+  the last 30 seconds of traces (`knative-ctl install zipkin`, see
+  [`infra/observability/`](../infra/observability/)) and pushes a
+  summary. Two views come out of it:
+  - **Per revision**: each revision's share of its Service's requests,
+    with average/max latency and error count. During a canary this is
+    the split as requests actually landed, next to the one configured.
+    It's a share, not a rate — Zipkin returns at most 500 traces per
+    query, so under a load test the window is a sample.
+  - **Recent requests**: one row per trace with the hops it took, its
+    CloudEvent type if it was an event, and a `cold start` badge when
+    the activator had to hold it for a pod to come up. Each row links
+    to the full trace.
+- `/zipkin/` — Zipkin's own UI, reverse-proxied, so those links work
+  without a second port-forward.
 
 No client-go, no new dependencies (stdlib `net/http` + `embed` only) —
 same "shell out to kubectl" approach as the rest of this repo, and

@@ -196,3 +196,94 @@ loadtestForm.addEventListener("submit", (ev) => {
     loadtestSource.close();
   };
 });
+
+// -- Live traffic ----------------------------------------------------------
+
+const trafficStatus = document.getElementById("traffic-status");
+const trafficWindow = document.getElementById("traffic-window");
+const trafficRevisions = document.getElementById("traffic-revisions");
+const trafficTable = document.getElementById("traffic-table");
+const trafficRows = document.getElementById("traffic-rows");
+
+// Everything in a snapshot originates from request data (URLs, header
+// values), so it goes through here before it's put into markup.
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+
+function formatMs(ms) {
+  if (ms >= 1000) return (ms / 1000).toFixed(2) + "s";
+  return (ms >= 10 ? ms.toFixed(0) : ms.toFixed(1)) + "ms";
+}
+
+function renderTraffic(snap) {
+  trafficWindow.textContent =
+    "(last " + snap.windowSeconds + "s" + (snap.sampled ? ", sampled" : "") + ")";
+
+  if (snap.total === 0) {
+    trafficStatus.hidden = false;
+    trafficStatus.textContent = "no requests in the last " + snap.windowSeconds + "s";
+  } else {
+    trafficStatus.hidden = true;
+  }
+
+  // Grouped by service, one bar per revision: during a canary this is
+  // the traffic split as requests actually landed, not as configured.
+  const byService = new Map();
+  for (const rev of snap.revisions) {
+    if (!byService.has(rev.service)) byService.set(rev.service, []);
+    byService.get(rev.service).push(rev);
+  }
+  let html = "";
+  for (const [service, revs] of byService) {
+    html += `<div class="traffic-service"><div class="traffic-service-name">${esc(service)}</div>`;
+    for (const rev of revs) {
+      const pct = Math.round(rev.share * 100);
+      html += `
+        <div class="traffic-rev">
+          <span class="traffic-rev-name">${esc(rev.revision)}</span>
+          <span class="traffic-bar"><span class="traffic-bar-fill" style="width:${pct}%"></span></span>
+          <span class="traffic-rev-stat">${pct}%</span>
+          <span class="traffic-rev-stat">${rev.count} req</span>
+          <span class="traffic-rev-stat">avg ${formatMs(rev.avgMs)}</span>
+          <span class="traffic-rev-stat">max ${formatMs(rev.maxMs)}</span>
+          <span class="traffic-rev-stat ${rev.errors ? "traffic-error" : ""}">${rev.errors} err</span>
+        </div>`;
+    }
+    html += "</div>";
+  }
+  trafficRevisions.innerHTML = html;
+
+  trafficTable.hidden = snap.traces.length === 0;
+  trafficRows.innerHTML = snap.traces.map((t) => {
+    const time = new Date(t.timestamp).toLocaleTimeString();
+    const badges =
+      (t.event ? `<span class="badge">${esc(t.event)}</span>` : "") +
+      (t.coldStartMs ? `<span class="badge badge-cold">cold start ${formatMs(t.coldStartMs)}</span>` : "");
+    return `
+      <tr class="${t.error ? "traffic-error" : ""}">
+        <td>${esc(time)}</td>
+        <td><a href="/zipkin/traces/${encodeURIComponent(t.id)}" target="_blank" rel="noopener">${esc(t.request)}</a>${badges}</td>
+        <td class="traffic-hops">${t.hops.map(esc).join(" → ")}</td>
+        <td class="num">${esc(t.status || "-")}</td>
+        <td class="num">${formatMs(t.durationMs)}</td>
+      </tr>`;
+  }).join("");
+}
+
+const trafficSource = new EventSource("/api/traffic/stream");
+trafficSource.onmessage = (ev) => {
+  try {
+    renderTraffic(JSON.parse(ev.data));
+  } catch {
+    // skip a malformed snapshot, the next one is two seconds away
+  }
+};
+trafficSource.addEventListener("unavailable", (ev) => {
+  trafficStatus.hidden = false;
+  trafficStatus.textContent = ev.data;
+  trafficRevisions.innerHTML = "";
+  trafficTable.hidden = true;
+});

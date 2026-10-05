@@ -14,7 +14,7 @@ SVC=knative-demo-app
 # distinct v2) also means the image is already cached on this node from
 # the initial deploy, keeping each step's cold start to JVM boot time only
 # (no re-pull).
-APP_IMAGE="ttl.sh/knative-demo-app-e2b8a442017d310d0820ba7d3439b0b9b876e08b:24h"
+APP_IMAGE="ghcr.io/ntlaletsi70/knative-demo-app:latest"
 
 step() {
   echo

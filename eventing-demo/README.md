@@ -71,17 +71,17 @@ knative-ctl install eventing                  # core + in-memory channel + mt ch
 kubectl apply -f manifests/00-broker.yaml
 kubectl apply -f manifests/01-subscribers.yaml
 kubectl apply -f manifests/02-triggers.yaml
-kubectl apply -f manifests/03-receiver.yaml   # update the image tags first, see below
+kubectl apply -f manifests/03-receiver.yaml
 kubectl apply -f manifests/04-webhook-ingress.yaml   # set its host to your own MagicDNS name
 
 tailscale funnel --bg 30412   # nginx-ingress's HTTP NodePort -- check yours:
                                #   kubectl get svc ingress-nginx-controller -n ingress-nginx
 ```
 
-Images are built by `.github/workflows/build-eventing-demo.yml`
-(same `ghcr.io`+`ttl.sh` dual-push pattern as `build-app.yml`/
-`build-ui.yml`) — update `manifests/01-subscribers.yaml` and
-`manifests/03-receiver.yaml`'s image tags after a build.
+Images are built by `.github/workflows/build-eventing-demo.yml` and
+pushed to `ghcr.io/ntlaletsi70/eventing-demo-{receiver,echo-logger}`;
+the manifests reference `:latest`. See the top-level README's CI
+section for what that means for picking up a new build.
 
 ## Verified
 

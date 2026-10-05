@@ -68,7 +68,7 @@ docker build -f ui/Dockerfile .
 ```
 
 `.github/workflows/build-ui.yml` does this in CI and pushes to
-`ghcr.io`/`ttl.sh`, mirroring `build-app.yml`. `ui/entrypoint.sh` builds
+`ghcr.io`, mirroring `build-app.yml`. `ui/entrypoint.sh` builds
 a kubeconfig from the pod's mounted ServiceAccount token at startup —
 `kubectl` (unlike client-go) has no automatic in-cluster mode, so this
 is the standard way to point the plain CLI at the API server from

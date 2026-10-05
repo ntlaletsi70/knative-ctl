@@ -30,7 +30,7 @@ spec:
         autoscaling.knative.dev/scale-down-delay: "30s"
     spec:
       containers:
-        - image: ttl.sh/knative-demo-app-c0c8efd860cd8f667df40e13e681dbfe3a0ec1fe:24h  # ttl.sh, 24h TTL from build -- see README for why (GHCR access blocked), rebuild via build-app.yml if expired
+        - image: ghcr.io/ntlaletsi70/knative-demo-app:latest
           ports:
             - containerPort: 8080
           env:

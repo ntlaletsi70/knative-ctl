@@ -26,7 +26,7 @@ def demo_app_pod_count():
     return 0 if not out else len(out.splitlines())
 
 FRAMES_DIR = "frames"
-IMAGE = "ttl.sh/knative-demo-app-58f4d5eb247e633e2e40dfaf1cb809d7e832a141:24h"
+IMAGE = "ghcr.io/ntlaletsi70/knative-demo-app:latest"
 FRONT_DOOR_HOST = "knative-ui.knative-demo.svc.cluster.local"
 FRONT_DOOR_IP = "192.168.0.200"
 

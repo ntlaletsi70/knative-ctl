@@ -37,4 +37,3 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/knative-ui:latest
             ghcr.io/${{ github.repository_owner }}/knative-ui:${{ github.sha }}
-            ttl.sh/knative-ui-${{ github.sha }}:24h

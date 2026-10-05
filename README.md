@@ -260,10 +260,8 @@ does):
   brief lull doesn't immediately scale back down.
 
 All three deploy the app in `app/` (see below) into the `knative-demo`
-namespace, currently pinned to a `ttl.sh/knative-demo-app-<sha>:24h`
-build rather than this repo's own `ghcr.io/ntlaletsi70/knative-demo-app`
-image — see the CI workflows section for why, and swap back to the
-`ghcr.io` reference once that's resolved.
+namespace, from `ghcr.io/ntlaletsi70/knative-demo-app:latest` (see the
+CI workflows section).
 
 **`examples/normal/`** — a plain single-revision service, 100% traffic by
 default (`spec.traffic` omitted):
@@ -306,18 +304,28 @@ more than the earlier Go demo, the example manifests request 100m CPU /
 **`build-app.yml`** — builds `app/` and pushes to
 `ghcr.io/<owner>/knative-demo-app:latest`/`:<sha>` on every push to
 `main` touching `app/**`, or via manual dispatch. Runs on GitHub's own
-hosted runner, so it needs nothing from the local machine. It also
-pushes to `ttl.sh/knative-demo-app-<sha>:24h` — the `ghcr.io` package
-was created back when this repo was private and inherited that access
-(a known GHCR gotcha: a package's "inherit access from source repo"
-setting is sticky and doesn't re-sync just because the repo's own
-visibility changes later, even with the package's own visibility set to
-public), so it's still not anonymously pullable even now that the repo
-is public. `ttl.sh` needs no auth for push or pull at all, so the example
-manifests are pinned to it for now. It's anonymous/ephemeral and the tag
-expires 24h after build — re-run this workflow to refresh it, and swap
-`examples/*.yaml` back to the `ghcr.io` reference once the package's own
-access setting is fixed.
+hosted runner, so it needs nothing from the local machine.
+
+The manifests in this repo reference `:latest`. Knative resolves a tag
+to a digest when it creates a Revision, so re-applying an unchanged
+manifest after a new build does **not** roll anything out — release a
+specific build instead, which is what the release flows are for:
+
+```
+knative-ctl canary knative-demo-app ghcr.io/ntlaletsi70/knative-demo-app:<sha> --namespace knative-demo
+```
+
+Every package has to be public for a cluster to pull it without
+credentials, and a package's visibility is its own setting: it does not
+follow the repo's. One created while the repo was private stays private
+after the repo goes public, until it's changed by hand under the
+package's own settings on GitHub (there is no API for it). Check one
+with:
+
+```
+curl -s "https://ghcr.io/token?scope=repository:ntlaletsi70/knative-demo-app:pull"
+# a token = public; "authentication required" = still private
+```
 
 **`deploy.yml`** — manual-dispatch workflow that runs one of `normal`,
 `canary`, `bluegreen`, or `rollback` via `knative-ctl` against a cluster.

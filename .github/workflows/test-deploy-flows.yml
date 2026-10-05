@@ -11,7 +11,7 @@ name: test-deploy-flows
 # after positional args were silently dropped).
 #
 # Uses gcr.io/knative-samples/helloworld-go throughout rather than this
-# repo's own ghcr.io/ttl.sh images, so the test doesn't depend on
+# repo's own ghcr.io images, so the test doesn't depend on
 # registry access that's unrelated to what it's actually verifying.
 on:
   push:
